@@ -1,7 +1,9 @@
 use std::iter;
 
 use ring;
-use ring::aead::{open_in_place, Aad, seal_in_place, OpeningKey, Nonce, SealingKey, CHACHA20_POLY1305};
+use ring::aead::{
+    open_in_place, seal_in_place, Aad, Nonce, OpeningKey, SealingKey, CHACHA20_POLY1305,
+};
 
 use super::{increase_nonce, CryptoError};
 
@@ -72,7 +74,7 @@ impl Encryptor {
         // Extend the message with TAG_LEN zeroes. This leaves space for the tag:
         msg_buffer.extend(iter::repeat(0).take(TAG_LEN).collect::<Vec<u8>>());
         let ad = Aad::empty();
-let nonce = Nonce::try_assume_unique_for_key(&enc_nonce.0).unwrap();
+        let nonce = Nonce::try_assume_unique_for_key(&enc_nonce.0).unwrap();
 
         match seal_in_place(
             &self.sealing_key,
