@@ -133,7 +133,7 @@ where
         + Send
         + Sync
         + 'static,
-    R: CryptoRandom + Clone + 'static,
+    R: CryptoRandom + Clone + Send + 'static,
     S: Spawn + Clone + Send + Sync + 'static,
 {
     let timer_stream = await!(timer_client.request_timer_stream())

@@ -118,7 +118,7 @@ pub async fn net_relay_server<IRC, R, S>(
 ) -> Result<(), NetRelayServerError>
 where
     IRC: Stream<Item = ConnPairVec> + Unpin + Send + 'static,
-    R: CryptoRandom + Clone + 'static,
+    R: CryptoRandom + Send + Clone + 'static,
     S: Spawn + Clone + Send + Sync + 'static,
 {
     let version_transform = VersionPrefix::new(PROTOCOL_VERSION, spawner.clone());

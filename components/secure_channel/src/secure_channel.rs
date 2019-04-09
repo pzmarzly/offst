@@ -198,7 +198,7 @@ where
     EK: 'static,
     M: Stream<Item = Vec<u8>> + Unpin + Send + 'static,
     K: Sink<SinkItem = Vec<u8>, SinkError = EK> + Unpin + Send + 'static,
-    R: CryptoRandom + Clone + 'static,
+    R: CryptoRandom + Clone +Send+ 'static,
     S: Spawn,
 {
     let (dh_state, writer, reader) = await!(initial_exchange(
@@ -238,7 +238,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct SecureChannel<R, S> {
+pub struct SecureChannel<R: Send, S> {
     identity_client: IdentityClient,
     rng: R,
     timer_client: TimerClient,
@@ -246,7 +246,7 @@ pub struct SecureChannel<R, S> {
     spawner: S,
 }
 
-impl<R, S> SecureChannel<R, S> {
+impl<R: Send, S> SecureChannel<R, S> {
     pub fn new(
         identity_client: IdentityClient,
         rng: R,
@@ -266,7 +266,7 @@ impl<R, S> SecureChannel<R, S> {
 
 impl<R, S> FutTransform for SecureChannel<R, S>
 where
-    R: CryptoRandom + Clone + 'static,
+    R: CryptoRandom + Clone +Send+ 'static,
     S: Spawn + Clone + Send + Sync,
 {
     /// Input:

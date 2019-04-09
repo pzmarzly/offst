@@ -1,23 +1,52 @@
 use std::collections::VecDeque;
+use std::ops::Deref;
 use std::sync::Arc;
- use std::ops::Deref;
 
-pub trait CryptoRandom<T = ring::rand::SecureRandom>: Deref<Target=T> + std::marker::Send + std::marker::Sync {}
-
-// impl CryptoRandom for ring::rand::SystemRandom {}
+use ring::error::Unspecified;
+use ring::rand::SecureRandom;
 
 pub const RAND_VALUE_LEN: usize = 16;
 
 define_fixed_bytes!(RandValue, RAND_VALUE_LEN);
 
-pub type OffstSystemRandom = Arc<ring::rand::SystemRandom>;
+// pub trait CryptoRandom: SecureRandom + Sync + Send {}
+pub use ring::rand::SecureRandom as  CryptoRandom;
+use ring::rand::SystemRandom;
+
+pub struct RngContainer<R> {
+    arc_rng: Arc<R>,
+}
+
+impl<R> RngContainer<R> {
+    pub fn new(rng: R) -> RngContainer<R> {
+        RngContainer {
+            arc_rng: Arc::new(rng),
+        }
+    }
+}
+
+impl<R> Clone for RngContainer<R> {
+    fn clone(&self) -> Self {
+        RngContainer {
+            arc_rng: self.arc_rng.clone(),
+        }
+    }
+}
+
+impl<R> Deref for RngContainer<R> {
+    type Target = R;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.arc_rng
+    }
+}
+
+pub type OffstSystemRandom = RngContainer<SystemRandom>;
 
 /// Returns a secure cryptographic random generator
 pub fn system_random() -> OffstSystemRandom {
-    Arc::new(ring::rand::SystemRandom::new())
+    RngContainer::new(SystemRandom::new())
 }
-
-impl CryptoRandom for OffstSystemRandom {}
 
 impl RandValue {
     pub fn new<R: CryptoRandom>(crypt_rng: &R) -> Self {
