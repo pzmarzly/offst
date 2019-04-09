@@ -36,6 +36,12 @@ impl From<::ring::error::Unspecified> for CryptoError {
     }
 }
 
+impl From<::ring::error::KeyRejected> for CryptoError {
+    fn from(_: ::ring::error::KeyRejected) -> CryptoError {
+        CryptoError
+    }
+}
+
 impl ::std::fmt::Display for CryptoError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         f.write_str("crypto error")
