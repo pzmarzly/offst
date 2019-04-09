@@ -35,10 +35,24 @@ impl From<[u8; SIGNATURE_LEN]> for Signature {
     }
 }
 
+/// Because AsRef is implemented for arrays up to 32 elements,
+/// we need a wrapper for array.
+pub struct Pkcs8KeyPair {
+    pub inner: [u8; PKCS8_DOCUMENT_SIZE],
+}
+
+impl AsRef<[u8]> for Pkcs8KeyPair {
+    fn as_ref(&self) -> &[u8] {
+        &self.inner[..]
+    }
+}
+
 /// Generate a pkcs8 key pair
-pub fn generate_pkcs8_key_pair<R: CryptoRandom>(rng: &R) -> [u8; PKCS8_DOCUMENT_SIZE] {
+pub fn generate_pkcs8_key_pair<R: CryptoRandom>(rng: &R) -> Pkcs8KeyPair {
     let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap();
-    pkcs8_document_to_bytes(document)
+    Pkcs8KeyPair {
+        inner: pkcs8_document_to_bytes(document),
+    }
 }
 
 fn pkcs8_document_to_bytes(document: impl AsRef<[u8]>) -> [u8; PKCS8_DOCUMENT_SIZE] {
@@ -59,15 +73,6 @@ pub trait Identity {
     fn get_public_key(&self) -> PublicKey;
 }
 
-/// Because AsRef is implemented for arrays up to 32 elements...
-struct Pkcs8Array([u8; PKCS8_DOCUMENT_SIZE]);
-
-impl AsRef<[u8]> for Pkcs8Array {
-                fn as_ref(&self) -> &[u8] {
-                    &self.0[..]
-                }
-            }
-
 pub struct SoftwareEd25519Identity {
     key_pair: signature::Ed25519KeyPair,
 }
@@ -75,10 +80,10 @@ pub struct SoftwareEd25519Identity {
 impl SoftwareEd25519Identity {
     pub fn generate<R: CryptoRandom>(rng: &R) -> Self {
         let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap();
-        let array = Pkcs8Array(document);
         Self::from_pkcs8(document).unwrap()
     }
 
+    /// ring::pkcs8::Document is private, but it implements `AsRef<[u8]>`
     pub fn from_pkcs8(document: impl AsRef<[u8]>) -> Result<Self, CryptoError> {
         Self::from_pkcs8_bytes(&pkcs8_document_to_bytes(document))
     }
@@ -205,9 +210,9 @@ impl ::std::fmt::Debug for Signature {
 
 #[cfg(test)]
 mod tests {
+    use super::super::test_utils::DummyRandom;
     use super::*;
     use ring::test::rand::FixedByteRandom;
-    use super::super::test_utils::DummyRandom;
 
     #[test]
     fn test_get_public_key_sanity() {
@@ -253,9 +258,14 @@ mod tests {
     }
 
     #[test]
-    fn test_pkcs8_document_cutting() {
-        let rng = DummyRandom::new(&[1, 2, 3, 4, 5]);
-        assert!(generate_pkcs8_key_pair(&rng)[..] ==
-        ring::signature::Ed25519KeyPair::generate_pkcs8(&rng).unwrap().as_ref()[..]);
+    fn test_pkcs8_document_size() {
+        let rng1 = DummyRandom::new(&[1, 2, 3, 4, 5]);
+        let rng2 = DummyRandom::new(&[1, 2, 3, 4, 5]);
+        assert_eq!(
+            generate_pkcs8_key_pair(&rng1).inner[..],
+            ring::signature::Ed25519KeyPair::generate_pkcs8(&rng2)
+                .unwrap()
+                .as_ref()[..]
+        );
     }
 }

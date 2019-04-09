@@ -76,7 +76,7 @@ enum GenIdentityError {
 fn gen_identity(matches: &ArgMatches) -> Result<(), GenIdentityError> {
     // Generate a new random keypair:
     let rng = system_random();
-    let pkcs8 = generate_pkcs8_key_pair(&rng);
+    let pkcs8 = generate_pkcs8_key_pair(&rng).inner;
     let output_path = Path::new(matches.value_of("output").unwrap());
 
     store_identity_to_file(pkcs8, output_path).map_err(|_| GenIdentityError::StoreToFileError)
