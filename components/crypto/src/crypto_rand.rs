@@ -2,56 +2,53 @@ use std::collections::VecDeque;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ring::error::Unspecified;
 use ring::rand::{SecureRandom, SystemRandom};
 
 pub const RAND_VALUE_LEN: usize = 16;
 
 define_fixed_bytes!(RandValue, RAND_VALUE_LEN);
 
-pub trait CryptoRandom: SecureRandom + Sync + Send {}
+pub trait CryptoRandom: Deref<Target=SecureRandom> + Sync + Send {}
 
-pub struct RngContainer<R> {
-    arc_rng: Arc<R>,
+pub struct RngContainer {
+    arc_rng: Arc<SystemRandom>,
 }
 
-impl<R> RngContainer<R> {
-    pub fn new(rng: R) -> RngContainer<R> {
-        RngContainer {
-            arc_rng: Arc::new(rng),
+impl RngContainer {
+    pub fn new() -> Self {
+        Self {
+            arc_rng: Arc::new(SystemRandom::new()),
         }
     }
 }
 
-impl<R> Clone for RngContainer<R> {
+impl Clone for RngContainer {
     fn clone(&self) -> Self {
-        RngContainer {
+        Self {
             arc_rng: self.arc_rng.clone(),
         }
     }
 }
 
-impl<R: SecureRandom> SecureRandom for RngContainer<R> {
-    fn fill(&self, dest: &mut [u8]) -> Result<(), Unspecified> {
-        (*self.arc_rng).fill(dest)
-    }
+lazy_static! {
+    pub static ref SYSTEM_RANDOM: SystemRandom = SystemRandom::new();
 }
 
-impl<R: SecureRandom> CryptoRandom for RngContainer<R> where R: Sync + Send {}
-
-impl<R> Deref for RngContainer<R> {
-    type Target = R;
+impl Deref for RngContainer {
+    type Target = SecureRandom;
 
     fn deref(&self) -> &Self::Target {
-        &*self.arc_rng
+        SYSTEM_RANDOM.deref()
     }
 }
 
-pub type OffstSystemRandom = RngContainer<SystemRandom>;
+impl CryptoRandom for RngContainer {}
+
+pub type OffstSystemRandom = RngContainer;
 
 /// Returns a secure cryptographic random generator
 pub fn system_random() -> OffstSystemRandom {
-    RngContainer::new(SystemRandom::new())
+    RngContainer::new()
 }
 
 impl RandValue {

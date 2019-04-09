@@ -10,6 +10,7 @@ use common::big_array::BigArray;
 
 pub const PUBLIC_KEY_LEN: usize = 32;
 pub const SIGNATURE_LEN: usize = 64;
+pub const PKCS8_DOCUMENT_SIZE: usize = 85;
 
 define_fixed_bytes!(PublicKey, PUBLIC_KEY_LEN);
 
@@ -34,9 +35,31 @@ impl From<[u8; SIGNATURE_LEN]> for Signature {
     }
 }
 
+/// Because AsRef is implemented for arrays up to 32 elements,
+/// we need a wrapper for array.
+pub struct Pkcs8KeyPair {
+    pub inner: [u8; PKCS8_DOCUMENT_SIZE],
+}
+
+impl AsRef<[u8]> for Pkcs8KeyPair {
+    fn as_ref(&self) -> &[u8] {
+        &self.inner[..]
+    }
+}
+
 /// Generate a pkcs8 key pair
-pub fn generate_pkcs8_key_pair<R: CryptoRandom>(rng: &R) -> [u8; 85] {
-    ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap()
+pub fn generate_pkcs8_key_pair<R: CryptoRandom>(rng: &R) -> Pkcs8KeyPair {
+    let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng.deref()).unwrap();
+    Pkcs8KeyPair {
+        inner: pkcs8_document_to_bytes(document),
+    }
+}
+
+fn pkcs8_document_to_bytes(document: impl AsRef<[u8]>) -> [u8; PKCS8_DOCUMENT_SIZE] {
+    let mut output = [0; PKCS8_DOCUMENT_SIZE];
+    let document_ref = document.as_ref();
+    output.copy_from_slice(document_ref);
+    output
 }
 
 /// A generic interface for signing and verifying messages.
@@ -55,7 +78,17 @@ pub struct SoftwareEd25519Identity {
 }
 
 impl SoftwareEd25519Identity {
-    pub fn from_pkcs8(pkcs8_bytes: &[u8]) -> Result<Self, CryptoError> {
+    pub fn generate<R: CryptoRandom>(rng: &R) -> Self {
+        let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng.deref()).unwrap();
+        Self::from_pkcs8(document).unwrap()
+    }
+
+    /// ring::pkcs8::Document is private, but it implements `AsRef<[u8]>`
+    pub fn from_pkcs8(document: impl AsRef<[u8]>) -> Result<Self, CryptoError> {
+        Self::from_pkcs8_bytes(&pkcs8_document_to_bytes(document))
+    }
+
+    pub fn from_pkcs8_bytes(pkcs8_bytes: &[u8]) -> Result<Self, CryptoError> {
         let key_pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(pkcs8_bytes))?;
 
         Ok(SoftwareEd25519Identity { key_pair })
@@ -81,8 +114,9 @@ impl Identity for SoftwareEd25519Identity {
     }
 
     fn get_public_key(&self) -> PublicKey {
+        use ring::signature::KeyPair;
         let mut public_key_array = [0; PUBLIC_KEY_LEN];
-        let public_key_ref = self.key_pair.public_key_bytes();
+        let public_key_ref = self.key_pair.public_key().as_ref();
         assert_eq!(public_key_ref.len(), PUBLIC_KEY_LEN);
         public_key_array.clone_from_slice(public_key_ref);
         PublicKey(public_key_array)
@@ -176,6 +210,7 @@ impl ::std::fmt::Debug for Signature {
 
 #[cfg(test)]
 mod tests {
+    use super::super::test_utils::DummyRandom;
     use super::*;
     use ring::test::rand::FixedByteRandom;
 
@@ -220,5 +255,17 @@ mod tests {
         let public_key2 = id2.get_public_key();
 
         assert!(!verify_signature(message, &public_key2, &signature1));
+    }
+
+    #[test]
+    fn test_pkcs8_document_size() {
+        let rng1 = DummyRandom::new(&[1, 2, 3, 4, 5]);
+        let rng2 = DummyRandom::new(&[1, 2, 3, 4, 5]);
+        assert_eq!(
+            generate_pkcs8_key_pair(&rng1).inner[..],
+            ring::signature::Ed25519KeyPair::generate_pkcs8(&rng2)
+                .unwrap()
+                .as_ref()[..]
+        );
     }
 }

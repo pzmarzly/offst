@@ -42,10 +42,9 @@ impl DhPrivateKey {
     /// Compute public key from our private key.
     /// The public key will be sent to remote side.
     pub fn compute_public_key(&self) -> Result<DhPublicKey, CryptoError> {
-        let mut public_key = DhPublicKey([0_u8; DH_PUBLIC_KEY_LEN]);
-
-        if self.0.compute_public_key(&mut public_key).is_ok() {
-            Ok(public_key)
+        use std::convert::TryFrom;
+        if let Ok(public_key) = self.0.compute_public_key() {
+            Ok(DhPublicKey::try_from(public_key.as_ref()).unwrap())
         } else {
             Err(CryptoError)
         }

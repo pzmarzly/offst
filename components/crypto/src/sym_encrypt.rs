@@ -1,7 +1,9 @@
 use std::iter;
 
 use ring;
-use ring::aead::{open_in_place, seal_in_place, OpeningKey, SealingKey, CHACHA20_POLY1305};
+use ring::aead::{
+    open_in_place, seal_in_place, Aad, Nonce, OpeningKey, SealingKey, CHACHA20_POLY1305,
+};
 
 use super::{increase_nonce, CryptoError};
 
@@ -71,12 +73,13 @@ impl Encryptor {
         msg_buffer.extend(plain_msg);
         // Extend the message with TAG_LEN zeroes. This leaves space for the tag:
         msg_buffer.extend(iter::repeat(0).take(TAG_LEN).collect::<Vec<u8>>());
-        let ad: [u8; 0] = [];
+        let ad = Aad::empty();
+        let nonce = Nonce::try_assume_unique_for_key(&enc_nonce.0).unwrap();
 
         match seal_in_place(
             &self.sealing_key,
-            &enc_nonce.0,
-            &ad,
+            nonce,
+            ad,
             &mut msg_buffer[ENC_NONCE_LEN..],
             TAG_LEN,
         ) {
@@ -110,9 +113,11 @@ impl Decryptor {
         }
 
         let mut msg_buffer = cipher_msg[ENC_NONCE_LEN..].to_vec();
-        let ad: [u8; 0] = [];
+        let ad = Aad::empty();
 
-        match open_in_place(&self.opening_key, enc_nonce, &ad, 0, &mut msg_buffer) {
+        let nonce = Nonce::try_assume_unique_for_key(enc_nonce).unwrap();
+
+        match open_in_place(&self.opening_key, nonce, ad, 0, &mut msg_buffer) {
             Ok(slice) => {
                 let _ = self.nonce_counter.next_nonce();
                 Ok(slice.to_vec())
