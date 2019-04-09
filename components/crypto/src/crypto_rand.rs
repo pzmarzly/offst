@@ -1,8 +1,10 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
+ use std::ops::Deref;
 
-pub trait CryptoRandom: ring::rand::SecureRandom + std::marker::Send + std::marker::Sync {}
-impl CryptoRandom for ring::rand::SystemRandom {}
+pub trait CryptoRandom<T = ring::rand::SecureRandom>: Deref<Target=T> + std::marker::Send + std::marker::Sync {}
+
+// impl CryptoRandom for ring::rand::SystemRandom {}
 
 pub const RAND_VALUE_LEN: usize = 16;
 
