@@ -1,0 +1,102 @@
+From ee04be503ad2b2ff994548c2fdea7c7d83f86189 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pawe=C5=82=20Zmarz=C5=82y?= <pawo2500@gmail.com>
+Date: Tue, 9 Apr 2019 16:47:56 +0200
+Subject: [PATCH] Patch for offst
+
+---
+ Cargo.toml                           |  1 +
+ src/ec/curve25519/ed25519/signing.rs |  5 +++
+ src/test.rs                          | 46 ++++++++++++++++++++++++++++
+ 3 files changed, 52 insertions(+)
+
+diff --git a/Cargo.toml b/Cargo.toml
+index faca85647..c329287e3 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -302,6 +302,7 @@ name = "ring"
+ [dependencies]
+ untrusted = { git = "https://github.com/briansmith/untrusted", tag = "ring-master" }
+ libc = { version = "0.2.48", default_features = false }
++rand = "0.6.5"
+ 
+ [target.'cfg(not(target_os = "ios"))'.dependencies]
+ spin = { version = "0.5.0" }
+diff --git a/src/ec/curve25519/ed25519/signing.rs b/src/ec/curve25519/ed25519/signing.rs
+index e3f77334e..091425306 100644
+--- a/src/ec/curve25519/ed25519/signing.rs
++++ b/src/ec/curve25519/ed25519/signing.rs
+@@ -203,6 +203,11 @@ impl Ed25519KeyPair {
+             SIGNATURE_LEN
+         })
+     }
++
++    /// Returns public key. Readded for offst
++    pub fn public_key_bytes(&self) -> &[u8] {
++        &self.public_key.0
++    }
+ }
+ 
+ impl signature::KeyPair for Ed25519KeyPair {
+diff --git a/src/test.rs b/src/test.rs
+index 68d28dfef..5175a4200 100644
+--- a/src/test.rs
++++ b/src/test.rs
+@@ -521,9 +521,55 @@ pub mod rand {
+         }
+     }
+ 
++    use std::cell::RefCell;
++    use std::sync::Mutex;
++
++    /// Seedable RNG, [taken from offst].
++    ///
++    /// [taken from offst]: https://github.com/freedomlayer/offst/blob/e83aac69626f69fb0609fb253e2168912be641b5/components/crypto/src/test_utils.rs#L9-L46
++    #[derive(Debug)]
++    pub struct DummyRandom {
++        inner: Mutex<RefCell<::rand::rngs::StdRng>>,
++    }
++
++    impl Clone for DummyRandom {
++        fn clone(&self) -> Self {
++            let guard = self.inner.lock().unwrap();
++            let rng = (*guard).clone();
++            DummyRandom {
++                inner: Mutex::new(rng),
++            }
++        }
++    }
++
++    impl DummyRandom {
++        pub fn new(seed: &[u8]) -> Self {
++            let mut rng_seed: [u8; 32] = [0; 32];
++            // We copy as many seed bytes as we have as seed into rng_seed
++            // If seed.len() > 32, clone_from_slice will panic.
++            rng_seed[..seed.len()].clone_from_slice(seed);
++            let rng = ::rand::SeedableRng::from_seed(rng_seed);
++
++            DummyRandom {
++                inner: Mutex::new(RefCell::new(rng)),
++            }
++        }
++    }
++
++    impl rand::SecureRandom for DummyRandom {
++        fn fill(&self, dest: &mut [u8]) -> Result<(), error::Unspecified> {
++            use ::rand::prelude::*;
++            let guard = self.inner.lock().unwrap();
++            let ref_cell = &*guard;
++            ref_cell.borrow_mut().fill_bytes(dest);
++            Ok(())
++        }
++    }
++
+     impl sealed::Sealed for FixedByteRandom {}
+     impl sealed::Sealed for FixedSliceRandom<'_> {}
+     impl sealed::Sealed for FixedSliceSequenceRandom<'_> {}
++    impl sealed::Sealed for DummyRandom {}
+ 
+ }
+ 
+-- 
+2.21.0
+

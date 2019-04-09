@@ -26,7 +26,6 @@ pub mod hash;
 pub mod identity;
 pub mod nonce_window;
 pub mod sym_encrypt;
-pub mod test_utils;
 pub mod uid;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -34,6 +33,12 @@ pub struct CryptoError;
 
 impl From<::ring::error::Unspecified> for CryptoError {
     fn from(_: ::ring::error::Unspecified) -> CryptoError {
+        CryptoError
+    }
+}
+
+impl From<::ring::error::KeyRejected> for CryptoError {
+    fn from(_: ::ring::error::KeyRejected) -> CryptoError {
         CryptoError
     }
 }

@@ -1,17 +1,21 @@
 use std::collections::VecDeque;
+use std::sync::Arc;
 
-pub use ring::rand::SecureRandom as CryptoRandom;
+pub trait CryptoRandom: ring::rand::SecureRandom + std::marker::Send + std::marker::Sync {}
+impl CryptoRandom for ring::rand::SystemRandom {}
 
 pub const RAND_VALUE_LEN: usize = 16;
 
 define_fixed_bytes!(RandValue, RAND_VALUE_LEN);
 
-pub use ring::rand::SystemRandom as OffstSystemRandom;
+pub type OffstSystemRandom = Arc<ring::rand::SystemRandom>;
 
 /// Returns a secure cryptographic random generator
 pub fn system_random() -> OffstSystemRandom {
-    OffstSystemRandom::new()
+    Arc::new(ring::rand::SystemRandom::new())
 }
+
+impl CryptoRandom for OffstSystemRandom {}
 
 impl RandValue {
     pub fn new<R: CryptoRandom>(crypt_rng: &R) -> Self {
