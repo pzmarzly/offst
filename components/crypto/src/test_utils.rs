@@ -34,6 +34,8 @@ impl DummyRandom {
     }
 }
 
+unsafe impl ring::sealed::Sealed for DummyRandom {}
+
 impl SecureRandom for DummyRandom {
     fn fill(&self, dest: &mut [u8]) -> Result<(), Unspecified> {
         let guard = self.inner.lock().unwrap();

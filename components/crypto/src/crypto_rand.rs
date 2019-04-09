@@ -31,6 +31,8 @@ impl<R> Clone for RngContainer<R> {
     }
 }
 
+unsafe impl<R> ring::sealed::Sealed for RngContainer<R> {}
+
 impl<R: SecureRandom> SecureRandom for RngContainer<R> {
     fn fill(&self, dest: &mut [u8]) -> Result<(), Unspecified> {
         (*self.arc_rng).fill(dest)
