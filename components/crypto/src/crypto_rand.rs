@@ -1,19 +1,33 @@
 use std::collections::VecDeque;
-use std::ops::Deref;
 
-use ring::rand::{SecureRandom, SystemRandom};
+use ring::rand::SystemRandom;
 
 pub const RAND_VALUE_LEN: usize = 16;
 
 define_fixed_bytes!(RandValue, RAND_VALUE_LEN);
 
-pub trait CryptoRandom: Deref<Target=SystemRandom> + Sync + Send {}
+pub trait CryptoRandom: ring::rand::SecureRandom + Send + Sync {}
 
 lazy_static! {
     pub static ref SYSTEM_RANDOM: SystemRandom = SystemRandom::new();
 }
 
-impl CryptoRandom for SYSTEM_RANDOM {}
+impl CryptoRandom for ring::rand::SystemRandom {}
+
+#[derive(Clone, Copy)]
+pub struct OffstSystemRandom;
+
+use std::ops::Deref;
+impl Deref for OffstSystemRandom {
+    type Target = SystemRandom;
+    fn deref(&self) -> &Self::Target {
+        SYSTEM_RANDOM.deref()
+    }
+}
+
+pub fn system_random() -> OffstSystemRandom {
+    OffstSystemRandom
+}
 
 impl RandValue {
     pub fn new<R: CryptoRandom>(crypt_rng: &R) -> Self {

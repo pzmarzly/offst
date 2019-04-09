@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::Unpin;
+use core::ops::Deref;
 
 use futures::channel::mpsc;
 use futures::task::{Spawn, SpawnExt};
@@ -334,7 +335,7 @@ where
     SC: FutTransform<Input = A, Output = Option<ConnPairVec>> + Clone + Send + 'static,
     ICC: Stream<Item = ConnPairVec> + Unpin + Send + 'static,
     ISC: Stream<Item = ConnPairVec> + Unpin + Send + 'static,
-    R: CryptoRandom + Clone + 'static,
+    R: Deref<Target = CryptoRandom> + Clone + 'static,
     GS: Spawn + Send + 'static,
     S: Spawn + Clone + Send + Sync + 'static,
 {
@@ -344,7 +345,7 @@ where
     let version_transform = VersionPrefix::new(PROTOCOL_VERSION, spawner.clone());
     let encrypt_transform = SecureChannel::new(
         identity_client,
-        rng.clone(),
+        rng.deref(),
         timer_client.clone(),
         TICKS_TO_REKEY,
         spawner.clone(),

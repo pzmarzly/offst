@@ -1,6 +1,7 @@
 extern crate untrusted;
 
 use ring::signature;
+use ring::rand::SecureRandom;
 use std::cmp::Ordering;
 
 use super::CryptoError;
@@ -47,8 +48,10 @@ impl AsRef<[u8]> for Pkcs8KeyPair {
     }
 }
 
+use std::ops::Deref;
+
 /// Generate a pkcs8 key pair
-pub fn generate_pkcs8_key_pair<R: CryptoRandom>(rng: &R) -> Pkcs8KeyPair {
+pub fn generate_pkcs8_key_pair<R: Deref<Target = SecureRandom>>(rng: &R) -> Pkcs8KeyPair {
     let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng.deref()).unwrap();
     Pkcs8KeyPair {
         inner: pkcs8_document_to_bytes(document),
@@ -79,7 +82,7 @@ pub struct SoftwareEd25519Identity {
 
 impl SoftwareEd25519Identity {
     pub fn generate<R: CryptoRandom>(rng: &R) -> Self {
-        let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng.deref()).unwrap();
+        let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap();
         Self::from_pkcs8(document).unwrap()
     }
 

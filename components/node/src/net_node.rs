@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
+use core::ops::Deref;
 
 use futures::channel::mpsc;
 use futures::task::{Spawn, SpawnExt};
@@ -174,7 +175,7 @@ where
         + Send
         + Sync
         + 'static,
-    R: CryptoRandom + Clone + 'static,
+    R: Deref<Target = CryptoRandom> + Clone + 'static,
     GT: Fn() -> Option<HashMap<PublicKey, AppPermissions>> + Clone + Send + 'static,
     AD: AtomicDb<State = NodeState<NetAddress>, Mutation = NodeMutation<NetAddress>>
         + Send
@@ -269,7 +270,7 @@ where
         database_client,
         version_connector,
         incoming_apps,
-        rng,
+        rng.deref(),
         spawner.clone()
     ))
     .map_err(NetNodeError::NodeError)
