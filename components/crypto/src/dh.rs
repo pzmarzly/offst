@@ -44,7 +44,7 @@ impl DhPrivateKey {
     pub fn compute_public_key(&self) -> Result<DhPublicKey, CryptoError> {
         use std::convert::TryFrom;
         if let Ok(public_key) = self.0.compute_public_key() {
-            Ok(DhPublicKey::try_from(public_key.0.as_ref()).unwrap())
+            Ok(DhPublicKey::try_from(public_key.as_ref()).unwrap())
         } else {
             Err(CryptoError)
         }

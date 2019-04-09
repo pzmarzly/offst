@@ -1,7 +1,7 @@
 use std::iter;
 
 use ring;
-use ring::aead::{open_in_place, Aad, seal_in_place, OpeningKey, SealingKey, CHACHA20_POLY1305};
+use ring::aead::{open_in_place, Aad, seal_in_place, OpeningKey, Nonce, SealingKey, CHACHA20_POLY1305};
 
 use super::{increase_nonce, CryptoError};
 

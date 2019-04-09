@@ -36,7 +36,11 @@ impl From<[u8; SIGNATURE_LEN]> for Signature {
 
 /// Generate a pkcs8 key pair
 pub fn generate_pkcs8_key_pair<R: CryptoRandom>(rng: &R) -> [u8; 85] {
-    ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap()
+    let mut output = [0; 85];
+    let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap();
+    let document_ref = document.as_ref();
+    output.copy_from_slice(document_ref);
+    output
 }
 
 /// A generic interface for signing and verifying messages.
@@ -55,6 +59,10 @@ pub struct SoftwareEd25519Identity {
 }
 
 impl SoftwareEd25519Identity {
+    pub fn generate<R: CryptoRandom>(rng: &R) -> Self {
+        let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap();
+    }
+
     pub fn from_pkcs8(pkcs8_bytes: &[u8]) -> Result<Self, CryptoError> {
         let key_pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(pkcs8_bytes))?;
 
@@ -81,8 +89,9 @@ impl Identity for SoftwareEd25519Identity {
     }
 
     fn get_public_key(&self) -> PublicKey {
+        use ring::signature::KeyPair;
         let mut public_key_array = [0; PUBLIC_KEY_LEN];
-        let public_key_ref = self.key_pair.public_key_bytes();
+        let public_key_ref = self.key_pair.public_key().as_ref();
         assert_eq!(public_key_ref.len(), PUBLIC_KEY_LEN);
         public_key_array.clone_from_slice(public_key_ref);
         PublicKey(public_key_array)
@@ -178,6 +187,7 @@ impl ::std::fmt::Debug for Signature {
 mod tests {
     use super::*;
     use ring::test::rand::FixedByteRandom;
+    use super::super::test_utils::DummyRandom;
 
     #[test]
     fn test_get_public_key_sanity() {
@@ -220,5 +230,12 @@ mod tests {
         let public_key2 = id2.get_public_key();
 
         assert!(!verify_signature(message, &public_key2, &signature1));
+    }
+
+    #[test]
+    fn test_pkcs8_document_cutting() {
+        let rng = DummyRandom::new(&[1, 2, 3, 4, 5]);
+        assert!(generate_pkcs8_key_pair(&rng)[..] ==
+        ring::signature::Ed25519KeyPair::generate_pkcs8(&rng).unwrap().as_ref()[..]);
     }
 }
