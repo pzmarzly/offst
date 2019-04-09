@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::ops::Deref;
-use std::sync::Arc;
 
 use ring::rand::{SecureRandom, SystemRandom};
 
@@ -8,48 +7,13 @@ pub const RAND_VALUE_LEN: usize = 16;
 
 define_fixed_bytes!(RandValue, RAND_VALUE_LEN);
 
-pub trait CryptoRandom: Deref<Target=SecureRandom> + Sync + Send {}
-
-pub struct RngContainer {
-    arc_rng: Arc<SystemRandom>,
-}
-
-impl RngContainer {
-    pub fn new() -> Self {
-        Self {
-            arc_rng: Arc::new(SystemRandom::new()),
-        }
-    }
-}
-
-impl Clone for RngContainer {
-    fn clone(&self) -> Self {
-        Self {
-            arc_rng: self.arc_rng.clone(),
-        }
-    }
-}
+pub trait CryptoRandom: Deref<Target=SystemRandom> + Sync + Send {}
 
 lazy_static! {
     pub static ref SYSTEM_RANDOM: SystemRandom = SystemRandom::new();
 }
 
-impl Deref for RngContainer {
-    type Target = SecureRandom;
-
-    fn deref(&self) -> &Self::Target {
-        SYSTEM_RANDOM.deref()
-    }
-}
-
-impl CryptoRandom for RngContainer {}
-
-pub type OffstSystemRandom = RngContainer;
-
-/// Returns a secure cryptographic random generator
-pub fn system_random() -> OffstSystemRandom {
-    RngContainer::new()
-}
+impl CryptoRandom for SYSTEM_RANDOM {}
 
 impl RandValue {
     pub fn new<R: CryptoRandom>(crypt_rng: &R) -> Self {
