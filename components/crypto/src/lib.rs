@@ -7,6 +7,8 @@
 )]
 // TODO: disallow clippy::too_many_arguments
 
+#![allow(warnings)]
+
 extern crate bytes;
 extern crate ring;
 #[macro_use]
