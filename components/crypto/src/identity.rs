@@ -10,6 +10,7 @@ use common::big_array::BigArray;
 
 pub const PUBLIC_KEY_LEN: usize = 32;
 pub const SIGNATURE_LEN: usize = 64;
+pub const PKCS8_DOCUMENT_SIZE: usize = 85;
 
 define_fixed_bytes!(PublicKey, PUBLIC_KEY_LEN);
 
@@ -35,9 +36,13 @@ impl From<[u8; SIGNATURE_LEN]> for Signature {
 }
 
 /// Generate a pkcs8 key pair
-pub fn generate_pkcs8_key_pair<R: CryptoRandom>(rng: &R) -> [u8; 85] {
-    let mut output = [0; 85];
+pub fn generate_pkcs8_key_pair<R: CryptoRandom>(rng: &R) -> [u8; PKCS8_DOCUMENT_SIZE] {
     let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap();
+    pkcs8_document_to_bytes(document)
+}
+
+fn pkcs8_document_to_bytes(document: impl AsRef<[u8]>) -> [u8; PKCS8_DOCUMENT_SIZE] {
+    let mut output = [0; PKCS8_DOCUMENT_SIZE];
     let document_ref = document.as_ref();
     output.copy_from_slice(document_ref);
     output
@@ -54,6 +59,15 @@ pub trait Identity {
     fn get_public_key(&self) -> PublicKey;
 }
 
+/// Because AsRef is implemented for arrays up to 32 elements...
+struct Pkcs8Array([u8; PKCS8_DOCUMENT_SIZE]);
+
+impl AsRef<[u8]> for Pkcs8Array {
+                fn as_ref(&self) -> &[u8] {
+                    &self.0[..]
+                }
+            }
+
 pub struct SoftwareEd25519Identity {
     key_pair: signature::Ed25519KeyPair,
 }
@@ -61,9 +75,15 @@ pub struct SoftwareEd25519Identity {
 impl SoftwareEd25519Identity {
     pub fn generate<R: CryptoRandom>(rng: &R) -> Self {
         let document = ring::signature::Ed25519KeyPair::generate_pkcs8(rng).unwrap();
+        let array = Pkcs8Array(document);
+        Self::from_pkcs8(document).unwrap()
     }
 
-    pub fn from_pkcs8(pkcs8_bytes: &[u8]) -> Result<Self, CryptoError> {
+    pub fn from_pkcs8(document: impl AsRef<[u8]>) -> Result<Self, CryptoError> {
+        Self::from_pkcs8_bytes(&pkcs8_document_to_bytes(document))
+    }
+
+    pub fn from_pkcs8_bytes(pkcs8_bytes: &[u8]) -> Result<Self, CryptoError> {
         let key_pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(pkcs8_bytes))?;
 
         Ok(SoftwareEd25519Identity { key_pair })
