@@ -120,7 +120,10 @@ pub fn load_trusted_servers(
         if path.is_dir() {
             continue;
         }
-        res_trusted.push(load_index_server_from_file(&path).map_err(|e| IndexServerDirectoryError::InvalidFile(path, e))?);
+        res_trusted.push(
+            load_index_server_from_file(&path)
+                .map_err(|e| IndexServerDirectoryError::InvalidFile(path, e))?,
+        );
     }
     Ok(res_trusted)
 }

@@ -82,7 +82,12 @@ struct StIndexCmd {
 fn run() -> Result<(), IndexServerBinError> {
     env_logger::init();
 
-    let StIndexCmd { idfile, lclient, lserver, trusted} = StIndexCmd::from_args();
+    let StIndexCmd {
+        idfile,
+        lclient,
+        lserver,
+        trusted,
+    } = StIndexCmd::from_args();
 
     let identity = load_identity_from_file(Path::new(&idfile))
         .map_err(|_| IndexServerBinError::LoadIdentityError)?;
@@ -124,13 +129,11 @@ fn run() -> Result<(), IndexServerBinError> {
 
     // Start listening to clients:
     let client_tcp_listener = TcpListener::new(MAX_FRAME_LENGTH, thread_pool.clone());
-    let (_config_sender, incoming_client_raw_conns) =
-        client_tcp_listener.listen(lclient);
+    let (_config_sender, incoming_client_raw_conns) = client_tcp_listener.listen(lclient);
 
     // Start listening to servers:
     let server_tcp_listener = TcpListener::new(MAX_FRAME_LENGTH, thread_pool.clone());
-    let (_config_sender, incoming_server_raw_conns) =
-        server_tcp_listener.listen(lserver);
+    let (_config_sender, incoming_server_raw_conns) = server_tcp_listener.listen(lserver);
 
     // A tcp connector, Used to connect to remote servers:
     let raw_server_net_connector =
