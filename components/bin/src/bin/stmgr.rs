@@ -89,7 +89,7 @@ struct RelayTicketCmd {
     output: PathBuf,
     /// Public address of the relay
     #[structopt(long = "address")]
-    address: SocketAddr,
+    address: String,
 }
 
 #[derive(Debug, StructOpt)]
@@ -102,7 +102,7 @@ struct IndexTicketCmd {
     output: PathBuf,
     /// Public address of the index server
     #[structopt(long = "address")]
-    address: SocketAddr,
+    address: String,
 }
 
 #[derive(Debug, StructOpt)]
@@ -115,7 +115,7 @@ struct NodeTicketCmd {
     output: PathBuf,
     /// Public address of the node server
     #[structopt(long = "address")]
-    address: SocketAddr,
+    address: String,
 }
 
 // TODO: Add version (0.1.0)
@@ -125,43 +125,42 @@ struct NodeTicketCmd {
 #[derive(Debug, StructOpt)]
 enum StMgrCmd {
     /// Initialize a new (empty) node database
-    #[structopt(name="init-node-db")]
+    #[structopt(name = "init-node-db")]
     InitNodeDb(InitNodeDbCmd),
     /// Randomly generate a new identity file
-    #[structopt(name="gen-ident")]
+    #[structopt(name = "gen-ident")]
     GenIdent(GenIdentCmd),
     /// Create an application ticket
-    #[structopt(name="app-ticket")]
+    #[structopt(name = "app-ticket")]
     AppTicket(AppTicketCmd),
-     /// Create a relay ticket
-    #[structopt(name="relay-ticket")]
+    /// Create a relay ticket
+    #[structopt(name = "relay-ticket")]
     RelayTicket(RelayTicketCmd),
     /// Create an index server ticket
-    #[structopt(name="index-ticket")]
+    #[structopt(name = "index-ticket")]
     IndexTicket(IndexTicketCmd),
     /// Create a node server ticket
-    #[structopt(name="node-ticket")]
+    #[structopt(name = "node-ticket")]
     NodeTicket(NodeTicketCmd),
 }
 
-fn init_node_db(InitNodeDbCmd{idfile, output}: InitNodeDbCmd) -> Result<(), InitNodeDbError> {
-    // Make sure that output_path does not exist.
-    // This program should never override any file! (Otherwise users might erase their database by
+fn init_node_db(InitNodeDbCmd { idfile, output }: InitNodeDbCmd) -> Result<(), InitNodeDbError> {
+    // Make sure that output does not exist.
+    // This program should never override any file!
+    // (Otherwise users might erase their database by
     // accident).
-    let output_path = PathBuf::from(output);
-    if output_path.exists() {
+    if output.exists() {
         return Err(InitNodeDbError::OutputAlreadyExists);
     }
 
     // Parse identity file:
-    let identity = load_identity_from_file(Path::new(&idfile))
-        .map_err(|_| InitNodeDbError::LoadIdentityError)?;
+    let identity =
+        load_identity_from_file(&idfile).map_err(|_| InitNodeDbError::LoadIdentityError)?;
     let local_public_key = identity.get_public_key();
 
     // Create a new database file:
     let initial_state = NodeState::<NetAddress>::new(local_public_key);
-    let _ = FileDb::create(output_path.to_path_buf(), initial_state)
-        .map_err(|_| InitNodeDbError::FileDbError)?;
+    let _ = FileDb::create(output, initial_state).map_err(|_| InitNodeDbError::FileDbError)?;
 
     Ok(())
 }
@@ -172,12 +171,12 @@ enum GenIdentityError {
 }
 
 /// Randomly generate an identity file (private-public key pair)
-fn gen_identity(GenIdentCmd{output}: GenIdentCmd) -> Result<(), GenIdentityError> {
+fn gen_identity(GenIdentCmd { output }: GenIdentCmd) -> Result<(), GenIdentityError> {
     // Generate a new random keypair:
     let rng = system_random();
     let pkcs8 = generate_pkcs8_key_pair(&rng);
 
-    store_identity_to_file(pkcs8, output).map_err(|_| GenIdentityError::StoreToFileError)
+    store_identity_to_file(pkcs8, &output).map_err(|_| GenIdentityError::StoreToFileError)
 }
 
 #[derive(Debug)]
@@ -194,17 +193,30 @@ enum AppTicketError {
 ///
 /// The app ticket is used to authorize an application to
 /// connect to a running node.
-fn app_ticket(AppTicketCmd {idfile, output, proutes, pfunds, pconfig}: AppTicketCmd) -> Result<(), AppTicketError> {
+fn app_ticket(
+    AppTicketCmd {
+        idfile,
+        output,
+        proutes,
+        pfunds,
+        pconfig,
+    }: AppTicketCmd,
+) -> Result<(), AppTicketError> {
     // Obtain app's public key:
     let identity = load_identity_from_file(Path::new(&idfile))
         .map_err(|_| AppTicketError::LoadIdentityError)?;
     let public_key = identity.get_public_key();
 
+    // Make sure that output does not exist.
+    if output.exists() {
+        return Err(AppTicketError::OutputAlreadyExists);
+    }
+
     // Get app's permissions:
     let permissions = AppPermissions {
-        routes,
-        send_funds,
-        config,
+        routes: proutes,
+        send_funds: pfunds,
+        config: pconfig,
     };
 
     // Store app ticket to file:
@@ -212,8 +224,7 @@ fn app_ticket(AppTicketCmd {idfile, output, proutes, pfunds, pconfig}: AppTicket
         public_key,
         permissions,
     };
-    store_trusted_app_to_file(&trusted_app, &output)
-        .map_err(|_| AppTicketError::StoreAppFileError)
+    store_trusted_app_to_file(&trusted_app, &output).map_err(|_| AppTicketError::StoreAppFileError)
 }
 
 #[derive(Debug)]
@@ -232,30 +243,29 @@ impl From<NetAddressError> for RelayTicketError {
 
 /// Create a public relay ticket
 /// The ticket can be fed into a running offst node
-fn relay_ticket(input: RelayTicketCmd) -> Result<(), RelayTicketError> {
-    let idfile = matches.value_of("idfile").unwrap();
-    let output = matches.value_of("output").unwrap();
-
-    // Make sure that output_path does not exist.
-    let output_path = Path::new(output);
-    if output_path.exists() {
+fn relay_ticket(
+    RelayTicketCmd {
+        idfile,
+        output,
+        address,
+    }: RelayTicketCmd,
+) -> Result<(), RelayTicketError> {
+    // Make sure that output does not exist.
+    if output.exists() {
         return Err(RelayTicketError::OutputAlreadyExists);
     }
 
     // Parse identity file:
-    let identity = load_identity_from_file(Path::new(&idfile))
-        .map_err(|_| RelayTicketError::LoadIdentityError)?;
+    let identity =
+        load_identity_from_file(&idfile).map_err(|_| RelayTicketError::LoadIdentityError)?;
     let public_key = identity.get_public_key();
-
-    let address_str = matches.value_of("address").unwrap();
 
     let relay_address = RelayAddress {
         public_key,
-        address: address_str.to_owned().try_into()?,
+        address: address.try_into()?,
     };
 
-    store_relay_to_file(&relay_address, &output_path)
-        .map_err(|_| RelayTicketError::StoreRelayFileError)
+    store_relay_to_file(&relay_address, &output).map_err(|_| RelayTicketError::StoreRelayFileError)
 }
 
 #[derive(Debug)]
@@ -274,29 +284,29 @@ impl From<NetAddressError> for IndexTicketError {
 
 /// Create a public index ticket
 /// The ticket can be fed into a running offst node
-fn index_ticket(input: IndexTicketCmd) -> Result<(), IndexTicketError> {
-    let idfile = matches.value_of("idfile").unwrap();
-    let output = matches.value_of("output").unwrap();
-
-    // Make sure that output_path does not exist.
-    let output_path = Path::new(output);
-    if output_path.exists() {
+fn index_ticket(
+    IndexTicketCmd {
+        idfile,
+        output,
+        address,
+    }: IndexTicketCmd,
+) -> Result<(), IndexTicketError> {
+    // Make sure that output does not exist.
+    if output.exists() {
         return Err(IndexTicketError::OutputAlreadyExists);
     }
 
     // Parse identity file:
-    let identity = load_identity_from_file(Path::new(&idfile))
-        .map_err(|_| IndexTicketError::LoadIdentityError)?;
+    let identity =
+        load_identity_from_file(&idfile).map_err(|_| IndexTicketError::LoadIdentityError)?;
     let public_key = identity.get_public_key();
-
-    let address_str = matches.value_of("address").unwrap();
 
     let index_address = IndexServerAddress {
         public_key,
-        address: address_str.to_owned().try_into()?,
+        address: address.try_into()?,
     };
 
-    store_index_server_to_file(&index_address, &output_path)
+    store_index_server_to_file(&index_address, &output)
         .map_err(|_| IndexTicketError::StoreIndexFileError)
 }
 
@@ -316,29 +326,29 @@ impl From<NetAddressError> for NodeTicketError {
 
 /// Create a node ticket
 /// The ticket can be fed into a node application
-fn node_ticket(input: NodeTicketCmd) -> Result<(), NodeTicketError> {
-    let idfile = matches.value_of("idfile").unwrap();
-    let output = matches.value_of("output").unwrap();
-
-    // Make sure that output_path does not exist.
-    let output_path = Path::new(output);
-    if output_path.exists() {
+fn node_ticket(
+    NodeTicketCmd {
+        idfile,
+        output,
+        address,
+    }: NodeTicketCmd,
+) -> Result<(), NodeTicketError> {
+    // Make sure that output does not exist.
+    if output.exists() {
         return Err(NodeTicketError::OutputAlreadyExists);
     }
 
     // Parse identity file:
-    let identity = load_identity_from_file(Path::new(&idfile))
-        .map_err(|_| NodeTicketError::LoadIdentityError)?;
+    let identity =
+        load_identity_from_file(&idfile).map_err(|_| NodeTicketError::LoadIdentityError)?;
     let public_key = identity.get_public_key();
-
-    let address_str = matches.value_of("address").unwrap();
 
     let node_address = NodeAddress {
         public_key,
-        address: address_str.to_owned().try_into()?,
+        address: address.try_into()?,
     };
 
-    store_node_to_file(&node_address, &output_path).map_err(|_| NodeTicketError::StoreNodeFileError)
+    store_node_to_file(&node_address, &output).map_err(|_| NodeTicketError::StoreNodeFileError)
 }
 
 #[allow(clippy::enum_variant_names)]
@@ -391,15 +401,15 @@ impl From<NodeTicketError> for StmError {
 fn run() -> Result<(), StmError> {
     env_logger::init();
 
-    match matches.subcommand() {
-        ("init-node-db", Some(matches)) => init_node_db(matches)?,
-        ("gen-ident", Some(matches)) => gen_identity(matches)?,
-        ("app-ticket", Some(matches)) => app_ticket(matches)?,
-        ("relay-ticket", Some(matches)) => relay_ticket(matches)?,
-        ("index-ticket", Some(matches)) => index_ticket(matches)?,
-        ("node-ticket", Some(matches)) => node_ticket(matches)?,
-        _ => unreachable!(),
+    match StMgrCmd::from_args() {
+        StMgrCmd::InitNodeDb(i) => init_node_db(i)?,
+        StMgrCmd::GenIdent(i) => gen_identity(i)?,
+        StMgrCmd::AppTicket(i) => app_ticket(i)?,
+        StMgrCmd::RelayTicket(i) => relay_ticket(i)?,
+        StMgrCmd::IndexTicket(i) => index_ticket(i)?,
+        StMgrCmd::NodeTicket(i) => node_ticket(i)?,
     }
+
     Ok(())
 }
 
