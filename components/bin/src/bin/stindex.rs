@@ -69,10 +69,10 @@ struct StIndexCmd {
     #[structopt(parse(from_os_str), short = "I", long = "idfile")]
     idfile: PathBuf,
     /// Listening address for clients
-    #[structopt(name = "lclient")]
+    #[structopt(long = "lclient")]
     lclient: SocketAddr,
     /// Listening address for servers
-    #[structopt(name = "lserver")]
+    #[structopt(long = "lserver")]
     lserver: SocketAddr,
     /// Directory path of trusted index servers
     #[structopt(parse(from_os_str), short = "T", long = "trusted")]
