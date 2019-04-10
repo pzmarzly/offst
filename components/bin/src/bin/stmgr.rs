@@ -49,7 +49,7 @@ struct InitNodeDbCmd {
     #[structopt(parse(from_os_str), short = "I", long = "idfile")]
     idfile: PathBuf,
     /// Database output file path
-    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    #[structopt(parse(from_os_str), short = "O", long = "output")]
     output: PathBuf,
 }
 
@@ -66,7 +66,7 @@ struct AppTicketCmd {
     #[structopt(parse(from_os_str), short = "I", long = "idfile")]
     idfile: PathBuf,
     /// Application ticket output file path
-    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    #[structopt(parse(from_os_str), short = "O", long = "output")]
     output: PathBuf,
     /// Permission to request reports
     #[structopt(long = "proutes")]
@@ -85,7 +85,7 @@ struct RelayTicketCmd {
     #[structopt(parse(from_os_str), short = "I", long = "idfile")]
     idfile: PathBuf,
     /// Relay ticket output file path
-    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    #[structopt(parse(from_os_str), short = "O", long = "output")]
     output: PathBuf,
     /// Public address of the relay
     #[structopt(long = "address")]
@@ -98,7 +98,7 @@ struct IndexTicketCmd {
     #[structopt(parse(from_os_str), short = "I", long = "idfile")]
     idfile: PathBuf,
     /// Index server ticket output file path
-    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    #[structopt(parse(from_os_str), short = "O", long = "output")]
     output: PathBuf,
     /// Public address of the index server
     #[structopt(long = "address")]
@@ -111,7 +111,7 @@ struct NodeTicketCmd {
     #[structopt(parse(from_os_str), short = "I", long = "idfile")]
     idfile: PathBuf,
     /// Node server ticket output file path
-    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    #[structopt(parse(from_os_str), short = "O", long = "output")]
     output: PathBuf,
     /// Public address of the node server
     #[structopt(long = "address")]
