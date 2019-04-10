@@ -1,6 +1,6 @@
+use derive_more::*;
 use ring::signature;
 use std::cmp::Ordering;
-use derive_more::*;
 
 use super::CryptoError;
 use crate::crypto_rand::CryptoRandom;
