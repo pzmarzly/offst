@@ -99,6 +99,7 @@ pub fn store_index_server_to_file(
 #[derive(Debug)]
 pub enum IndexServerDirectoryError {
     IoError(io::Error),
+    InvalidDirectory(io::Error),
     InvalidFile(PathBuf, IndexServerFileError),
 }
 
@@ -114,7 +115,7 @@ pub fn load_trusted_servers(
     dir_path: &Path,
 ) -> Result<Vec<IndexServerAddress<NetAddress>>, IndexServerDirectoryError> {
     let mut res_trusted = Vec::new();
-    for entry in fs::read_dir(dir_path)? {
+    for entry in fs::read_dir(dir_path).map_err(IndexServerDirectoryError::InvalidDirectory)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
