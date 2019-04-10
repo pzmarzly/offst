@@ -17,7 +17,7 @@ extern crate log;
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use structopt::StructOpt;
 
 use crypto::crypto_rand::system_random;
 use crypto::identity::{generate_pkcs8_key_pair, Identity};
@@ -41,6 +41,52 @@ enum InitNodeDbError {
     OutputAlreadyExists,
     LoadIdentityError,
     FileDbError,
+}
+
+#[derive(Debug, StructOpt)]
+struct InitNodeDbCmd {
+    /// StCtrl app identity file path
+    #[structopt(parse(from_os_str), short = "I", long = "idfile")]
+    idfile: PathBuf,
+    /// Identity file output file path
+    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    output: PathBuf,
+}
+
+#[derive(Debug, StructOpt)]
+struct GenIdentCmd {
+    /// Identity file output file path
+    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    output: PathBuf,
+}
+
+#[derive(Debug, StructOpt)]
+struct AppTicketCmd {
+    /// StCtrl app identity file path
+    #[structopt(parse(from_os_str), short = "I", long = "idfile")]
+    idfile: PathBuf,
+    /// Identity file output file path
+    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    output: PathBuf,
+    #[structopt(long = "proutes")]
+    proutes: bool,
+}
+
+// TODO: Add version (0.1.0)
+// TODO: Add author
+// TODO: Add description - Performs Offst related management operations
+/// stmgr: offST ManaGeR
+#[derive(Debug, StructOpt)]
+enum StMgrCmd {
+    /// Initialize a new (empty) node database
+    #[structopt(name="init-node-db")]
+    InitNodeDb(InitNodeDbCmd),
+    /// Randomly generate a new identity file
+    #[structopt(name="gen-ident")]
+    GenIdent(GenIdentCmd),
+    /// Create an application ticket
+    #[structopt(name="app-ticket")]
+    AppTicket(AppTicketCmd),
 }
 
 fn init_node_db(matches: &ArgMatches) -> Result<(), InitNodeDbError> {
@@ -301,14 +347,14 @@ impl From<NodeTicketError> for StmError {
 
 fn run() -> Result<(), StmError> {
     env_logger::init();
-    let matches = App::new("stmgr: offST ManaGeR")
+    let matches = App::new("")
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .version("0.1.0")
         .author("real <real@freedomlayer.org>")
-        .about("Performs Offst related management operations")
+        .about("")
         .subcommand(
             SubCommand::with_name("init-node-db")
-                .about("Initialize a new (empty) node database")
+                .about("")
                 .arg(
                     Arg::with_name("output")
                         .short("o")
@@ -327,20 +373,20 @@ fn run() -> Result<(), StmError> {
                 ),
         )
         .subcommand(
-            SubCommand::with_name("gen-ident")
-                .about("Randomly generate a new identity file")
+            SubCommand::with_name("")
+                .about("")
                 .arg(
                     Arg::with_name("output")
                         .short("o")
                         .long("output")
                         .value_name("output")
-                        .help("Identity file output file path")
+                        .help("")
                         .required(true),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("app-ticket")
-                .about("Create an application ticket")
+            SubCommand::with_name("")
+                .about("")
                 .arg(
                     Arg::with_name("idfile")
                         .short("i")
