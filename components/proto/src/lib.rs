@@ -28,6 +28,9 @@ extern crate toml;
 extern crate tempfile;
 
 #[macro_use]
+extern crate derive_more;
+
+#[macro_use]
 pub mod macros;
 pub mod app_server;
 pub mod capnp_common;
