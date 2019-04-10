@@ -48,7 +48,7 @@ struct InitNodeDbCmd {
     /// StCtrl app identity file path
     #[structopt(parse(from_os_str), short = "I", long = "idfile")]
     idfile: PathBuf,
-    /// Identity file output file path
+    /// Database output file path
     #[structopt(parse(from_os_str), short = "I", long = "output")]
     output: PathBuf,
 }
@@ -65,11 +65,57 @@ struct AppTicketCmd {
     /// StCtrl app identity file path
     #[structopt(parse(from_os_str), short = "I", long = "idfile")]
     idfile: PathBuf,
-    /// Identity file output file path
+    /// Application ticket output file path
     #[structopt(parse(from_os_str), short = "I", long = "output")]
     output: PathBuf,
+    /// Permission to request reports
     #[structopt(long = "proutes")]
     proutes: bool,
+    /// Permission to send funds
+    #[structopt(long = "pfunds")]
+    pfunds: bool,
+    /// Permission to change configuration
+    #[structopt(long = "pconfig")]
+    pconfig: bool,
+}
+
+#[derive(Debug, StructOpt)]
+struct RelayTicketCmd {
+    /// StCtrl app identity file path
+    #[structopt(parse(from_os_str), short = "I", long = "idfile")]
+    idfile: PathBuf,
+    /// Relay ticket output file path
+    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    output: PathBuf,
+    /// Public address of the relay
+    #[structopt(long = "address")]
+    address: SocketAddr,
+}
+
+#[derive(Debug, StructOpt)]
+struct IndexTicketCmd {
+    /// StCtrl app identity file path
+    #[structopt(parse(from_os_str), short = "I", long = "idfile")]
+    idfile: PathBuf,
+    /// Index server ticket output file path
+    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    output: PathBuf,
+    /// Public address of the index server
+    #[structopt(long = "address")]
+    address: SocketAddr,
+}
+
+#[derive(Debug, StructOpt)]
+struct NodeTicketCmd {
+    /// StCtrl app identity file path
+    #[structopt(parse(from_os_str), short = "I", long = "idfile")]
+    idfile: PathBuf,
+    /// Node server ticket output file path
+    #[structopt(parse(from_os_str), short = "I", long = "output")]
+    output: PathBuf,
+    /// Public address of the node server
+    #[structopt(long = "address")]
+    address: SocketAddr,
 }
 
 // TODO: Add version (0.1.0)
@@ -87,11 +133,18 @@ enum StMgrCmd {
     /// Create an application ticket
     #[structopt(name="app-ticket")]
     AppTicket(AppTicketCmd),
+     /// Create a relay ticket
+    #[structopt(name="relay-ticket")]
+    RelayTicket(RelayTicketCmd),
+    /// Create an index server ticket
+    #[structopt(name="index-ticket")]
+    IndexTicket(IndexTicketCmd),
+    /// Create a node server ticket
+    #[structopt(name="node-ticket")]
+    NodeTicket(NodeTicketCmd),
 }
 
-fn init_node_db(matches: &ArgMatches) -> Result<(), InitNodeDbError> {
-    let idfile = matches.value_of("idfile").unwrap();
-    let output = matches.value_of("output").unwrap();
+fn init_node_db(InitNodeDbCmd{idfile, output}: InitNodeDbCmd) -> Result<(), InitNodeDbError> {
     // Make sure that output_path does not exist.
     // This program should never override any file! (Otherwise users might erase their database by
     // accident).
@@ -119,13 +172,12 @@ enum GenIdentityError {
 }
 
 /// Randomly generate an identity file (private-public key pair)
-fn gen_identity(matches: &ArgMatches) -> Result<(), GenIdentityError> {
+fn gen_identity(GenIdentCmd{output}: GenIdentCmd) -> Result<(), GenIdentityError> {
     // Generate a new random keypair:
     let rng = system_random();
     let pkcs8 = generate_pkcs8_key_pair(&rng);
-    let output_path = Path::new(matches.value_of("output").unwrap());
 
-    store_identity_to_file(pkcs8, output_path).map_err(|_| GenIdentityError::StoreToFileError)
+    store_identity_to_file(pkcs8, output).map_err(|_| GenIdentityError::StoreToFileError)
 }
 
 #[derive(Debug)]
@@ -142,16 +194,7 @@ enum AppTicketError {
 ///
 /// The app ticket is used to authorize an application to
 /// connect to a running node.
-fn app_ticket(matches: &ArgMatches) -> Result<(), AppTicketError> {
-    let idfile = matches.value_of("idfile").unwrap();
-    let output = matches.value_of("output").unwrap();
-
-    // Make sure that output_path does not exist.
-    let output_path = Path::new(output);
-    if output_path.exists() {
-        return Err(AppTicketError::OutputAlreadyExists);
-    }
-
+fn app_ticket(AppTicketCmd {idfile, output, proutes, pfunds, pconfig}: AppTicketCmd) -> Result<(), AppTicketError> {
     // Obtain app's public key:
     let identity = load_identity_from_file(Path::new(&idfile))
         .map_err(|_| AppTicketError::LoadIdentityError)?;
@@ -159,9 +202,9 @@ fn app_ticket(matches: &ArgMatches) -> Result<(), AppTicketError> {
 
     // Get app's permissions:
     let permissions = AppPermissions {
-        routes: matches.is_present("proutes"),
-        send_funds: matches.is_present("pfunds"),
-        config: matches.is_present("pconfig"),
+        routes,
+        send_funds,
+        config,
     };
 
     // Store app ticket to file:
@@ -169,7 +212,7 @@ fn app_ticket(matches: &ArgMatches) -> Result<(), AppTicketError> {
         public_key,
         permissions,
     };
-    store_trusted_app_to_file(&trusted_app, &output_path)
+    store_trusted_app_to_file(&trusted_app, &output)
         .map_err(|_| AppTicketError::StoreAppFileError)
 }
 
@@ -189,7 +232,7 @@ impl From<NetAddressError> for RelayTicketError {
 
 /// Create a public relay ticket
 /// The ticket can be fed into a running offst node
-fn relay_ticket(matches: &ArgMatches) -> Result<(), RelayTicketError> {
+fn relay_ticket(input: RelayTicketCmd) -> Result<(), RelayTicketError> {
     let idfile = matches.value_of("idfile").unwrap();
     let output = matches.value_of("output").unwrap();
 
@@ -231,7 +274,7 @@ impl From<NetAddressError> for IndexTicketError {
 
 /// Create a public index ticket
 /// The ticket can be fed into a running offst node
-fn index_ticket(matches: &ArgMatches) -> Result<(), IndexTicketError> {
+fn index_ticket(input: IndexTicketCmd) -> Result<(), IndexTicketError> {
     let idfile = matches.value_of("idfile").unwrap();
     let output = matches.value_of("output").unwrap();
 
@@ -273,7 +316,7 @@ impl From<NetAddressError> for NodeTicketError {
 
 /// Create a node ticket
 /// The ticket can be fed into a node application
-fn node_ticket(matches: &ArgMatches) -> Result<(), NodeTicketError> {
+fn node_ticket(input: NodeTicketCmd) -> Result<(), NodeTicketError> {
     let idfile = matches.value_of("idfile").unwrap();
     let output = matches.value_of("output").unwrap();
 
@@ -347,163 +390,6 @@ impl From<NodeTicketError> for StmError {
 
 fn run() -> Result<(), StmError> {
     env_logger::init();
-    let matches = App::new("")
-        .setting(AppSettings::SubcommandRequiredElseHelp)
-        .version("0.1.0")
-        .author("real <real@freedomlayer.org>")
-        .about("")
-        .subcommand(
-            SubCommand::with_name("init-node-db")
-                .about("")
-                .arg(
-                    Arg::with_name("output")
-                        .short("o")
-                        .long("output")
-                        .value_name("output")
-                        .help("Database output file path")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("idfile")
-                        .short("i")
-                        .long("idfile")
-                        .value_name("idfile")
-                        .help("identity file path")
-                        .required(true),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("")
-                .about("")
-                .arg(
-                    Arg::with_name("output")
-                        .short("o")
-                        .long("output")
-                        .value_name("output")
-                        .help("")
-                        .required(true),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("")
-                .about("")
-                .arg(
-                    Arg::with_name("idfile")
-                        .short("i")
-                        .long("idfile")
-                        .value_name("idfile")
-                        .help("identity file path")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("output")
-                        .short("o")
-                        .long("output")
-                        .value_name("output")
-                        .help("Application ticket output file path")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("proutes")
-                        .long("proutes")
-                        .help("Permission to request reports"),
-                )
-                .arg(
-                    Arg::with_name("pfunds")
-                        .long("pfunds")
-                        .help("Permission to send funds"),
-                )
-                .arg(
-                    Arg::with_name("pconfig")
-                        .long("pconfig")
-                        .help("Permission to change configuration"),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("relay-ticket")
-                .about("Create a relay ticket")
-                .arg(
-                    Arg::with_name("idfile")
-                        .short("i")
-                        .long("idfile")
-                        .value_name("idfile")
-                        .help("identity file path")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("address")
-                        .short("a")
-                        .long("address")
-                        .value_name("address")
-                        .help("Public address of the relay")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("output")
-                        .short("o")
-                        .long("output")
-                        .value_name("output")
-                        .help("Relay ticket output file path")
-                        .required(true),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("index-ticket")
-                .about("Create an index server ticket")
-                .arg(
-                    Arg::with_name("idfile")
-                        .short("i")
-                        .long("idfile")
-                        .value_name("idfile")
-                        .help("identity file path")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("address")
-                        .short("a")
-                        .long("address")
-                        .value_name("address")
-                        .help("Public address of the index server")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("output")
-                        .short("o")
-                        .long("output")
-                        .value_name("output")
-                        .help("Index server ticket output file path")
-                        .required(true),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("node-ticket")
-                .about("Create a node server ticket")
-                .arg(
-                    Arg::with_name("idfile")
-                        .short("i")
-                        .long("idfile")
-                        .value_name("idfile")
-                        .help("identity file path")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("address")
-                        .short("a")
-                        .long("address")
-                        .value_name("address")
-                        .help("Public address of the node server")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("output")
-                        .short("o")
-                        .long("output")
-                        .value_name("output")
-                        .help("Node server ticket output file path")
-                        .required(true),
-                ),
-        )
-        .get_matches();
 
     match matches.subcommand() {
         ("init-node-db", Some(matches)) => init_node_db(matches)?,
