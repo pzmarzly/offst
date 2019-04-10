@@ -61,7 +61,7 @@ enum RelayServerBinError {
 #[derive(Debug, StructOpt)]
 struct StRelayCmd {
     /// StCtrl app identity file path
-    #[structopt(parse(from_os_str), short = "I", long = "idfile")]
+    #[structopt(parse(from_os_str), short = "i", long = "idfile")]
     idfile: PathBuf,
     /// Listening address
     #[structopt(long = "laddr")]

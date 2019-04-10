@@ -66,7 +66,7 @@ enum IndexServerBinError {
 #[derive(Debug, StructOpt)]
 struct StIndexCmd {
     /// StCtrl app identity file path
-    #[structopt(parse(from_os_str), short = "I", long = "idfile")]
+    #[structopt(parse(from_os_str), short = "i", long = "idfile")]
     idfile: PathBuf,
     /// Listening address for clients
     #[structopt(long = "lclient")]
@@ -75,7 +75,7 @@ struct StIndexCmd {
     #[structopt(long = "lserver")]
     lserver: SocketAddr,
     /// Directory path of trusted index servers
-    #[structopt(parse(from_os_str), short = "T", long = "trusted")]
+    #[structopt(parse(from_os_str), short = "t", long = "trusted")]
     trusted: PathBuf,
 }
 

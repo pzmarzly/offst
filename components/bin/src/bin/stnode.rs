@@ -83,16 +83,16 @@ enum NodeBinError {
 #[derive(Debug, StructOpt)]
 struct StNodeCmd {
     /// StCtrl app identity file path
-    #[structopt(parse(from_os_str), short = "I", long = "idfile")]
+    #[structopt(parse(from_os_str), short = "i", long = "idfile")]
     idfile: PathBuf,
     /// Listening address (Used for communication with apps)
-    #[structopt(short = "L", long = "laddr")]
+    #[structopt(short = "l", long = "laddr")]
     laddr: SocketAddr,
     /// Database file path
-    #[structopt(parse(from_os_str), short = "D", long = "database")]
+    #[structopt(parse(from_os_str), short = "d", long = "database")]
     database: PathBuf,
     /// Directory path of trusted applications
-    #[structopt(parse(from_os_str), short = "T", long = "trusted")]
+    #[structopt(parse(from_os_str), short = "t", long = "trusted")]
     trusted: PathBuf,
 }
 
