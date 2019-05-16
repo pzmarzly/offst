@@ -104,12 +104,13 @@ where
     C: FutTransform<Input = (RA, PublicKey), Output = Option<RawConn>> + Clone,
     ET: FutTransform<Input = (PublicKey, RawConn), Output = Option<RawConn>> + Clone,
 {
-    let f = client_connector.transform((address, friend_public_key.clone())).then(|r|
+    let f = async {
+        let r = await!(client_connector.transform((address, friend_public_key.clone())));
         match r {
-            Some(raw_conn) => encrypt_transform.transform((friend_public_key.clone(), raw_conn)),
-            None => Box::pin(future::ready(None)), // match arms need same return types
+            Some(raw_conn) => await!(encrypt_transform.transform((friend_public_key.clone(), raw_conn))),
+            None => await!(Box::pin(future::ready(None))),
         }
-    );
+    };
     select! {
         x = f.fuse() => x,
         _ = canceler.fuse() => None,
