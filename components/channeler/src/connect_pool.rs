@@ -5,9 +5,9 @@ use std::marker::{PhantomData, Unpin};
 use std::mem;
 
 use futures::channel::{mpsc, oneshot};
-use futures::future::{self, select, Either};
+use futures::future::{self};
 use futures::task::{Spawn, SpawnExt};
-use futures::{stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::{stream, select, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
 
 use common::conn::{BoxFuture, FutTransform};
 use common::select_streams::{select_streams, BoxStream};
@@ -104,21 +104,15 @@ where
     C: FutTransform<Input = (RA, PublicKey), Output = Option<RawConn>> + Clone,
     ET: FutTransform<Input = (PublicKey, RawConn), Output = Option<RawConn>> + Clone,
 {
-    let connect_fut = Box::pin(async {
-        let raw_conn = await!(client_connector.transform((address, friend_public_key.clone())))?;
-        await!(encrypt_transform.transform((friend_public_key.clone(), raw_conn)))
-    });
-
-    // We either finish connecting, or got canceled in the middle:
-    if let Some(x) = await!(select(connect_fut.fuse(), canceler.fuse()).map(|either| {
-        match either {
-            Either::Left((x, _a)) => Some(x),
-            Either::Right(_) => None,
+    let f = client_connector.transform((address, friend_public_key.clone())).then(|r|
+        match r {
+            Some(raw_conn) => encrypt_transform.transform((friend_public_key.clone(), raw_conn)),
+            None => Box::pin(future::ready(None)), // match arms need same return types
         }
-    })) {
-        x
-    } else {
-        None
+    );
+    select! {
+        x = f.fuse() => x,
+        _ = canceler.fuse() => None,
     }
 }
 
