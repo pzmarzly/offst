@@ -5,8 +5,9 @@ use std::marker::{PhantomData, Unpin};
 use std::mem;
 
 use futures::channel::{mpsc, oneshot};
+use futures::future::{self, select, Either};
 use futures::task::{Spawn, SpawnExt};
-use futures::{future, select, stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::{stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
 
 use common::conn::{BoxFuture, FutTransform};
 use common::select_streams::{select_streams, BoxStream};
@@ -103,16 +104,21 @@ where
     C: FutTransform<Input = (RA, PublicKey), Output = Option<RawConn>> + Clone,
     ET: FutTransform<Input = (PublicKey, RawConn), Output = Option<RawConn>> + Clone,
 {
-    // TODO: How to remove this Box::pin?
-    let connect_fut = Box::pin(async move {
+    let connect_fut = Box::pin(async {
         let raw_conn = await!(client_connector.transform((address, friend_public_key.clone())))?;
         await!(encrypt_transform.transform((friend_public_key.clone(), raw_conn)))
     });
 
     // We either finish connecting, or got canceled in the middle:
-    select! {
-        connect_fut = connect_fut.fuse() => connect_fut,
-        _ = canceler.fuse() => None,
+    if let Some(x) = await!(select(connect_fut.fuse(), canceler.fuse()).map(|either| {
+        match either {
+            Either::Left((x, _a)) => Some(x),
+            Either::Right(_) => None,
+        }
+    })) {
+        x
+    } else {
+        None
     }
 }
 
