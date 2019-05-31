@@ -97,8 +97,11 @@ pub struct AppServer<B: Clone, TF, TIC, S> {
     spawner: S,
 }
 
-/// Check if we should process an app_message from an app with certain permissions
-fn check_permissions<B>(app_permissions: &AppPermissions, app_request: &AppRequest<B>) -> bool {
+/// Check if we should process an app_request from an app with certain permissions
+fn check_request_permissions<B>(
+    app_permissions: &AppPermissions,
+    app_request: &AppRequest<B>,
+) -> bool {
     match app_request {
         AppRequest::AddRelay(_) => app_permissions.config,
         AppRequest::RemoveRelay(_) => app_permissions.config,
@@ -329,34 +332,38 @@ where
         Ok(())
     }
 
+    fn check_app_permissions(&self, app_id: u128, app_message: &AppToAppServer<B>) -> bool {
+        // Get the relevant application:
+        let app = match self.apps.get(&app_id) {
+            Some(app) => app,
+            None => {
+                warn!("App {:?} does not exist!", app_id);
+                return false;
+            }
+        };
+
+        // Make sure this message is allowed for this application:
+        if !check_request_permissions(&app.permissions, &app_message.app_request) {
+            warn!(
+                "App {:?} does not have permissions for {:?}",
+                app_id, app_message
+            );
+            return false;
+        }
+
+        true
+    }
+
     async fn handle_app_message(
         &mut self,
         app_id: u128,
         app_message: AppToAppServer<B>,
     ) -> Result<(), AppServerError> {
-        // Get the relevant application:
-
-        {
-            let app = match self.apps.get(&app_id) {
-                Some(app) => app,
-                None => {
-                    warn!("App {:?} does not exist!", app_id);
-                    return Ok(());
-                }
-            };
-
-            // Make sure this message is allowed for this application:
-            if !check_permissions(&app.permissions, &app_message.app_request) {
-                warn!(
-                    "App {:?} does not have permissions for {:?}",
-                    app_id, app_message
-                );
-                return Ok(());
-            }
+        if !self.check_app_permissions(app_id, &app_message) {
+            return Ok(());
         }
 
         let app_request_id = app_message.app_request_id;
-
         match app_message.app_request {
             AppRequest::AddRelay(named_relay_address) => {
                 await!(self.to_funder.send(FunderIncomingControl::new(
@@ -379,7 +386,7 @@ where
             AppRequest::CreateTransaction(create_transaction) => {
                 // Keep track of which application issued this request:
                 self.transactions
-                    .insert(create_transaction.request_id.clone(), app_id);
+                    .insert(create_transaction.request_id, app_id);
                 await!(self.to_funder.send(FunderIncomingControl::new(
                     app_request_id,
                     FunderControl::CreateTransaction(create_transaction)
