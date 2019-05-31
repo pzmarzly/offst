@@ -41,6 +41,7 @@ pub enum AppServerError {
     AllAppsClosed,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum AppServerEvent<B: Clone> {
     IncomingConnection(IncomingAppConnection<B>),
