@@ -13,7 +13,7 @@ use crypto::payment_id::PaymentId;
 use crypto::uid::Uid;
 
 use proto::funder::messages::{
-    FriendStatus, FunderControl, FunderIncomingControl, FunderOutgoingControl, RemoveFriend,
+    FriendStatus, FunderControl, FunderIncomingControl, FunderOutgoingControl,
     RequestsStatus, SetFriendStatus, SetRequestsStatus,
 };
 use proto::report::convert::funder_report_mutation_to_index_mutation;
@@ -332,6 +332,25 @@ where
         Ok(())
     }
 
+    pub async fn handle_from_app(
+        &mut self,
+        app_id: u128,
+        opt_app_message: Option<AppToAppServer<B>>,
+    ) -> Result<(), AppServerError> {
+        match opt_app_message {
+            None => {
+                // Remove the application. We assert that this application exists
+                // in our apps map:
+                self.apps.remove(&app_id).unwrap();
+                if self.apps.is_empty() && self.incoming_connections_closed {
+                    return Err(AppServerError::AllAppsClosed);
+                }
+                Ok(())
+            }
+            Some(app_message) => await!(self.handle_app_message(app_id, app_message)),
+        }
+    }
+
     fn check_app_permissions(&self, app_id: u128, app_message: &AppToAppServer<B>) -> bool {
         // Get the relevant application:
         let app = match self.apps.get(&app_id) {
@@ -363,158 +382,88 @@ where
             return Ok(());
         }
 
-        let app_request_id = app_message.app_request_id;
+        let AppToAppServer {
+            app_request,
+            app_request_id,
+        } = app_message;
 
-        macro_rules! funder {
+        macro_rules! to_funder {
             ( $x:expr ) => {{
                 use FunderControl::*;
-                await!(self
-                    .to_funder
+                await!(self.to_funder
                     .send(FunderIncomingControl::new(app_request_id, $x)))
                 .map_err(|_| AppServerError::SendToFunderError)
             }};
         }
 
-        macro_rules! funder_direct {
-            ( $x:type ) => {
-                AppRequest::AddRelay(named_relay_address) => funder!(AddRelay(named_relay_address)),
-            }
+        macro_rules! to_index_client {
+            ( $x:expr ) => {{
+                use IndexClientRequest::*;
+                await!(self.to_index_client.send(AppServerToIndexClient::AppRequest((app_request_id, $x))))
+                    .map_err(|_| AppServerError::SendToIndexClientError)
+            }};
         }
 
-        match app_message.app_request {
-            AppRequest::AddRelay(named_relay_address) => funder!(AddRelay(named_relay_address)),
-            AppRequest::RemoveRelay(public_key) => funder!(RemoveRelay(public_key)),
-            AppRequest::CreatePayment(create_payment) => funder!(CreatePayment(create_payment)),
-            AppRequest::CreateTransaction(create_transaction) => {
+        use AppRequest::*;
+        match app_request {
+            // Requests that go to funder:
+            AddRelay(x) => to_funder!(AddRelay(x)),
+            RemoveRelay(x) => to_funder!(RemoveRelay(x)),
+            CreatePayment(x) => to_funder!(CreatePayment(x)),
+            RequestClosePayment(x) => to_funder!(RequestClosePayment(x)),
+            AckClosePayment(x) => to_funder!(AckClosePayment(x)),
+            AddInvoice(x) => to_funder!(AddInvoice(x)),
+            CancelInvoice(x) => to_funder!(CancelInvoice(x)),
+            CommitInvoice(x) => to_funder!(CommitInvoice(x)),
+            AddFriend(x) => to_funder!(AddFriend(x)),
+            SetFriendRelays(x) => to_funder!(SetFriendRelays(x)),
+            SetFriendName(x) => to_funder!(SetFriendName(x)),
+            SetFriendRemoteMaxDebt(x) => to_funder!(SetFriendRemoteMaxDebt(x)),
+            SetFriendRate(x) => to_funder!(SetFriendRate(x)),
+            ResetFriendChannel(x) => to_funder!(ResetFriendChannel(x)),
+            CreateTransaction(create_transaction) => {
                 // Keep track of which application issued this request:
                 self.transactions
                     .insert(create_transaction.request_id, app_id);
-                funder!(CreateTransaction(create_transaction))
+                to_funder!(CreateTransaction(create_transaction))
             }
-            AppRequest::RequestClosePayment(request_close_payment) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::RequestClosePayment(request_close_payment)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
+            RemoveFriend(friend_public_key) => {
+                let remove_friend = proto::funder::messages::RemoveFriend { friend_public_key };
+                to_funder!(RemoveFriend(remove_friend))
             }
-            AppRequest::AckClosePayment(ack_close_payment) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::AckClosePayment(ack_close_payment)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::AddInvoice(add_invoice) => await!(self.to_funder.send(
-                FunderIncomingControl::new(app_request_id, FunderControl::AddInvoice(add_invoice))
-            ))
-            .map_err(|_| AppServerError::SendToFunderError),
-            AppRequest::CancelInvoice(invoice_id) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::CancelInvoice(invoice_id)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::CommitInvoice(multi_commit) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::CommitInvoice(multi_commit)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::AddFriend(add_friend) => await!(self.to_funder.send(
-                FunderIncomingControl::new(app_request_id, FunderControl::AddFriend(add_friend))
-            ))
-            .map_err(|_| AppServerError::SendToFunderError),
-            AppRequest::SetFriendRelays(set_friend_address) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::SetFriendRelays(set_friend_address)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::SetFriendName(set_friend_name) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::SetFriendName(set_friend_name)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::RemoveFriend(friend_public_key) => {
-                let remove_friend = RemoveFriend { friend_public_key };
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::RemoveFriend(remove_friend)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::EnableFriend(friend_public_key) => {
+            EnableFriend(friend_public_key) => {
                 let set_friend_status = SetFriendStatus {
                     friend_public_key,
                     status: FriendStatus::Enabled,
                 };
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::SetFriendStatus(set_friend_status)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
+                to_funder!(SetFriendStatus(set_friend_status))
             }
-            AppRequest::DisableFriend(friend_public_key) => {
+            DisableFriend(friend_public_key) => {
                 let set_friend_status = SetFriendStatus {
                     friend_public_key,
                     status: FriendStatus::Disabled,
                 };
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::SetFriendStatus(set_friend_status)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
+                to_funder!(SetFriendStatus(set_friend_status))
             }
-            AppRequest::OpenFriend(friend_public_key) => {
+            OpenFriend(friend_public_key) => {
                 let set_requests_status = SetRequestsStatus {
                     friend_public_key,
                     status: RequestsStatus::Open,
                 };
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::SetRequestsStatus(set_requests_status)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
+                to_funder!(SetRequestsStatus(set_requests_status))
             }
-            AppRequest::CloseFriend(friend_public_key) => {
+            CloseFriend(friend_public_key) => {
                 let set_requests_status = SetRequestsStatus {
                     friend_public_key,
                     status: RequestsStatus::Closed,
                 };
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::SetRequestsStatus(set_requests_status)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
+                to_funder!(SetRequestsStatus(set_requests_status))
             }
-            AppRequest::SetFriendRemoteMaxDebt(set_friend_remote_max_debt) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::SetFriendRemoteMaxDebt(set_friend_remote_max_debt)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::SetFriendRate(set_friend_rate) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::SetFriendRate(set_friend_rate)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::ResetFriendChannel(reset_friend_channel) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::ResetFriendChannel(reset_friend_channel)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::RequestRoutes(request_routes) => {
+
+            // Requests that go to index client:
+            AddIndexServer(x) => to_index_client!(AddIndexServer(x)),
+            RemoveIndexServer(x) => to_index_client!(RemoveIndexServer(x)),
+            RequestRoutes(request_routes) => {
                 // Keep track of which application issued this request:
                 if self
                     .route_requests
@@ -523,47 +472,8 @@ where
                 {
                     warn!("RequestRoutes: request_id clash.");
                 }
-                await!(self
-                    .to_index_client
-                    .send(AppServerToIndexClient::AppRequest((
-                        app_request_id,
-                        IndexClientRequest::RequestRoutes(request_routes)
-                    ))))
-                .map_err(|_| AppServerError::SendToIndexClientError)
+                to_index_client!(RequestRoutes(request_routes))
             }
-            AppRequest::AddIndexServer(named_index_server_address) => await!(self
-                .to_index_client
-                .send(AppServerToIndexClient::AppRequest((
-                    app_request_id,
-                    IndexClientRequest::AddIndexServer(named_index_server_address)
-                ))))
-            .map_err(|_| AppServerError::SendToIndexClientError),
-            AppRequest::RemoveIndexServer(index_server_address) => await!(self
-                .to_index_client
-                .send(AppServerToIndexClient::AppRequest((
-                    app_request_id,
-                    IndexClientRequest::RemoveIndexServer(index_server_address)
-                ))))
-            .map_err(|_| AppServerError::SendToIndexClientError),
-        }
-    }
-
-    pub async fn handle_from_app(
-        &mut self,
-        app_id: u128,
-        opt_app_message: Option<AppToAppServer<B>>,
-    ) -> Result<(), AppServerError> {
-        match opt_app_message {
-            None => {
-                // Remove the application. We assert that this application exists
-                // in our apps map:
-                self.apps.remove(&app_id).unwrap();
-                if self.apps.is_empty() && self.incoming_connections_closed {
-                    return Err(AppServerError::AllAppsClosed);
-                }
-                Ok(())
-            }
-            Some(app_message) => await!(self.handle_app_message(app_id, app_message)),
         }
     }
 }
