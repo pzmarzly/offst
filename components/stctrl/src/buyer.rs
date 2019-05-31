@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use futures::future::select_all;
 
 use app::ser_string::{payment_id_to_string, string_to_payment_id};
-use app::{AppRoutes, AppBuyer, MultiCommit, NodeConnection, PaymentStatus, PublicKey};
+use app::{AppBuyer, AppRoutes, MultiCommit, NodeConnection, PaymentStatus, PublicKey};
 
 use structopt::StructOpt;
 
@@ -279,11 +279,9 @@ pub async fn buyer(
             app_buyer,
             writer,
         ))?,
-        BuyerCmd::PaymentStatus(payment_status_cmd) => await!(buyer_payment_status(
-            payment_status_cmd,
-            app_buyer,
-            writer,
-        ))?,
+        BuyerCmd::PaymentStatus(payment_status_cmd) => {
+            await!(buyer_payment_status(payment_status_cmd, app_buyer, writer,))?
+        }
     }
 
     Ok(())

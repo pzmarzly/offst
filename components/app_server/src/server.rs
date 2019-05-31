@@ -399,13 +399,10 @@ where
                 )))
                 .map_err(|_| AppServerError::SendToFunderError)
             }
-            AppRequest::AddInvoice(add_invoice) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::AddInvoice(add_invoice)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
+            AppRequest::AddInvoice(add_invoice) => await!(self.to_funder.send(
+                FunderIncomingControl::new(app_request_id, FunderControl::AddInvoice(add_invoice))
+            ))
+            .map_err(|_| AppServerError::SendToFunderError),
             AppRequest::CancelInvoice(invoice_id) => {
                 await!(self.to_funder.send(FunderIncomingControl::new(
                     app_request_id,
@@ -515,7 +512,8 @@ where
                 // Keep track of which application issued this request:
                 if self
                     .route_requests
-                    .insert(request_routes.request_id, app_id).is_some()
+                    .insert(request_routes.request_id, app_id)
+                    .is_some()
                 {
                     warn!("RequestRoutes: request_id clash.");
                 }
