@@ -253,20 +253,20 @@ where
         let (sfs_cancel_sender, sfs_cancel_receiver) = oneshot::channel::<()>();
         let (sfs_done_sender, sfs_done_receiver) = oneshot::channel::<()>();
 
-        // TODO: Can we remove the Box::pin() from here? How?
         let connect_fut = Box::pin(async move {
             let res = await!(c_index_client_session.transform(index_server))?;
             let (control_sender, close_receiver) = res;
 
             let c_control_sender = control_sender.clone();
             let send_full_state_cancellable_fut = async move {
-                let send_full_state_fut = Box::pin(
+                let mut send_full_state_fut =
                     send_full_state(c_seq_friends_client, c_control_sender)
                         .map_err(|e| warn!("Error in send_full_state(): {:?}", e))
                         .map(|_| {
                             let _ = sfs_done_sender.send(());
-                        }),
-                );
+                        });
+
+                let send_full_state_fut = unsafe { core::pin::Pin::new_unchecked(&mut send_full_state_fut)};
 
                 select! {
                     _sfs_cancel_receiver = sfs_cancel_receiver.fuse() => (),
@@ -281,6 +281,20 @@ where
             let _ = await!(close_receiver);
             Some(())
         });
+
+    // Trying to Pin::new_unchecked connect_fut:
+    //
+    //     error[E0597]: `connect_fut` does not live long enough
+    //    --> components/index_client/src/index_client.rs:285:66
+    //     |
+    // 285 |         let connect_fut = unsafe { core::pin::Pin::new_unchecked(&mut connect_fut)};
+    //     |                                    ------------------------------^^^^^^^^^^^^^^^^-
+    //     |                                    |                             |
+    //     |                                    |                             borrowed value does not live long enough
+    //     |                                    argument requires that `connect_fut` is borrowed for `'static`
+    // ...
+    // 308 |     }
+    //     |     - `connect_fut` dropped here while still borrowed
 
         let mut c_event_sender = self.event_sender.clone();
         let cancellable_fut = async move {
