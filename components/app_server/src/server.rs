@@ -364,34 +364,32 @@ where
         }
 
         let app_request_id = app_message.app_request_id;
+
+        macro_rules! funder {
+            ( $x:expr ) => {{
+                use FunderControl::*;
+                await!(self
+                    .to_funder
+                    .send(FunderIncomingControl::new(app_request_id, $x)))
+                .map_err(|_| AppServerError::SendToFunderError)
+            }};
+        }
+
+        macro_rules! funder_direct {
+            ( $x:type ) => {
+                AppRequest::AddRelay(named_relay_address) => funder!(AddRelay(named_relay_address)),
+            }
+        }
+
         match app_message.app_request {
-            AppRequest::AddRelay(named_relay_address) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::AddRelay(named_relay_address)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
-            AppRequest::RemoveRelay(public_key) => await!(self.to_funder.send(
-                FunderIncomingControl::new(app_request_id, FunderControl::RemoveRelay(public_key))
-            ))
-            .map_err(|_| AppServerError::SendToFunderError),
-            AppRequest::CreatePayment(create_payment) => {
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::CreatePayment(create_payment)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
-            }
+            AppRequest::AddRelay(named_relay_address) => funder!(AddRelay(named_relay_address)),
+            AppRequest::RemoveRelay(public_key) => funder!(RemoveRelay(public_key)),
+            AppRequest::CreatePayment(create_payment) => funder!(CreatePayment(create_payment)),
             AppRequest::CreateTransaction(create_transaction) => {
                 // Keep track of which application issued this request:
                 self.transactions
                     .insert(create_transaction.request_id, app_id);
-                await!(self.to_funder.send(FunderIncomingControl::new(
-                    app_request_id,
-                    FunderControl::CreateTransaction(create_transaction)
-                )))
-                .map_err(|_| AppServerError::SendToFunderError)
+                funder!(CreateTransaction(create_transaction))
             }
             AppRequest::RequestClosePayment(request_close_payment) => {
                 await!(self.to_funder.send(FunderIncomingControl::new(
