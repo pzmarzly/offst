@@ -2,6 +2,15 @@
 
 # CODECOV_TOKEN Must be set at this point.
 
+function_pstree(){
+    while :
+    do
+        pstree
+        sleep 10
+    done
+}
+function_pstree &
+
 exes=$(find target/${TARGET}/debug -maxdepth 1 -executable -type f)
 for exe in ${exes}; do
     ${HOME}/install/kcov-${TARGET}/bin/kcov \
@@ -9,7 +18,7 @@ for exe in ${exes}; do
         --exclude-path=/usr/include \
         --include-pattern="components" \
         target/kcov \
-        ${exe}
+        ${exe} | ts '[%M:%.S]'
 done
 
 # Automatically reads from CODECOV_TOKEN environment variable:
