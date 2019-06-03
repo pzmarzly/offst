@@ -33,7 +33,6 @@ matrix:
         - gcc-6
         - g++-6
         - moreutils
-        - psmisc
         sources:
         - ubuntu-toolchain-r-test
     script:
@@ -45,7 +44,7 @@ matrix:
       # We add target dir so that kcov can find the test files to run:
     - cargo test --target ${TARGET}
     - travis/trusty/post/kcov/try-install.sh
-    - travis/trusty/post/kcov/run.sh
+    - travis_wait 20 travis/trusty/post/kcov/run.sh
 
   - env: TARGET=x86_64-apple-darwin
     os: osx
