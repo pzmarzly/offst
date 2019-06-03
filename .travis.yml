@@ -39,9 +39,9 @@ matrix:
     script:
     - travis/trusty/pre/cargo-config.sh
     - travis/trusty/pre/capnp.sh
-    - cargo fmt --all -- --check
+    #- cargo fmt --all -- --check
       # TODO: Enable these two lints when clippy bugs are solved:
-    - cargo clippy -- -A clippy::needless_lifetimes -A clippy::identity_conversion
+    #- cargo clippy -- -A clippy::needless_lifetimes -A clippy::identity_conversion
       # We add target dir so that kcov can find the test files to run:
     - cargo test --target ${TARGET}
     - travis/trusty/post/kcov/try-install.sh
