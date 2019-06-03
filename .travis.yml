@@ -33,7 +33,7 @@ matrix:
         - gcc-6
         - g++-6
         - moreutils
-        - pstree
+        - psmisc
         sources:
         - ubuntu-toolchain-r-test
     script:
