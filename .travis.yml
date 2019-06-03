@@ -32,6 +32,8 @@ matrix:
         packages:
         - gcc-6
         - g++-6
+        - moreutils
+        - pstree
         sources:
         - ubuntu-toolchain-r-test
     script:
