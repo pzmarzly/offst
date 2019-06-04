@@ -7,7 +7,7 @@ for exe in ${exes}; do
     echo ">>> kcov: " ${exe}
     ${HOME}/install/kcov-${TARGET}/bin/kcov \
         --verify \
-        --exclude-path=/usr/include \
+        --exclude-pattern=/.cargo,/usr/lib \
         --include-pattern="components" \
         target/kcov \
         ${exe} | ts '[%M:%.S]'
