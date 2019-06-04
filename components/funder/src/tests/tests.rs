@@ -31,20 +31,30 @@ async fn task_funder_basic(spawner: impl Spawn + Clone + Send + 'static) {
     assert_eq!(node_controls[0].report.friends.len(), 1);
     assert_eq!(node_controls[1].report.friends.len(), 1);
 
+    dbg!();
+
     await!(node_controls[0].set_friend_status(&public_keys[1], FriendStatus::Enabled));
     await!(node_controls[1].set_friend_status(&public_keys[0], FriendStatus::Enabled));
+
+    dbg!();
 
     // Set remote max debt for both sides:
     await!(node_controls[0].set_remote_max_debt(&public_keys[1], 200));
     await!(node_controls[1].set_remote_max_debt(&public_keys[0], 100));
 
+    dbg!();
+
     // Open requests:
     await!(node_controls[0].set_requests_status(&public_keys[1], RequestsStatus::Open));
     await!(node_controls[1].set_requests_status(&public_keys[0], RequestsStatus::Open));
 
+    dbg!();
+
     // Wait for liveness:
     await!(node_controls[0].wait_until_ready(&public_keys[1]));
     await!(node_controls[1].wait_until_ready(&public_keys[0]));
+
+    dbg!();
 
     // Let node 1 open an invoice:
     let add_invoice = AddInvoice {
@@ -52,6 +62,8 @@ async fn task_funder_basic(spawner: impl Spawn + Clone + Send + 'static) {
         total_dest_payment: 4,
     };
     await!(node_controls[1].send(FunderControl::AddInvoice(add_invoice)));
+
+    dbg!();
 
     // Create payment 0 --> 1
     let create_payment = CreatePayment {
@@ -61,6 +73,8 @@ async fn task_funder_basic(spawner: impl Spawn + Clone + Send + 'static) {
         dest_public_key: node_controls[1].public_key.clone(),
     };
     await!(node_controls[0].send(FunderControl::CreatePayment(create_payment)));
+
+    dbg!();
 
     // Create transaction 0 --> 1:
     let create_transaction = CreateTransaction {
@@ -73,13 +87,19 @@ async fn task_funder_basic(spawner: impl Spawn + Clone + Send + 'static) {
         fees: 1,
     };
 
+    dbg!();
+
     await!(node_controls[0].send(FunderControl::CreateTransaction(create_transaction)));
     let transaction_result = await!(node_controls[0].recv_until_transaction_result()).unwrap();
+
+    dbg!();
 
     let commit = match transaction_result.result {
         RequestResult::Success(commit) => commit,
         _ => unreachable!(),
     };
+
+    dbg!();
 
     // 0: Create multi commit:
     let multi_commit = MultiCommit {
@@ -90,8 +110,12 @@ async fn task_funder_basic(spawner: impl Spawn + Clone + Send + 'static) {
 
     // MultiCommit: 0 --> 1  (Out of band)
 
+    dbg!();
+
     // 1: Apply MultiCommit:
     await!(node_controls[1].send(FunderControl::CommitInvoice(multi_commit)));
+
+    dbg!();
 
     // 0: Expect a receipt:
     let (receipt, ack_uid) = loop {
@@ -108,12 +132,16 @@ async fn task_funder_basic(spawner: impl Spawn + Clone + Send + 'static) {
         }
     };
 
+    dbg!();
+
     // 0: Acknowledge response close:
     let ack_close_payment = AckClosePayment {
         payment_id: PaymentId::from(&[2u8; PAYMENT_ID_LEN]),
         ack_uid,
     };
     await!(node_controls[0].send(FunderControl::AckClosePayment(ack_close_payment)));
+
+    dbg!();
 
     assert_eq!(receipt.invoice_id, InvoiceId::from(&[1u8; INVOICE_ID_LEN]));
     assert_eq!(receipt.dest_payment, 4);
@@ -130,6 +158,8 @@ async fn task_funder_basic(spawner: impl Spawn + Clone + Send + 'static) {
     };
     await!(node_controls[0].recv_until(pred));
 
+    dbg!();
+
     let pred = |report: &FunderReport<_>| {
         let friend = report.friends.get(&public_keys[0]).unwrap();
         let tc_report = match &friend.channel_status {
@@ -139,6 +169,8 @@ async fn task_funder_basic(spawner: impl Spawn + Clone + Send + 'static) {
         tc_report.balance.balance == -3
     };
     await!(node_controls[1].recv_until(pred));
+
+    dbg!();
 }
 
 #[test]
