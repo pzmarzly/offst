@@ -10,7 +10,7 @@ for exe in ${exes}; do
         --exclude-pattern=/.cargo,/usr/lib \
         --include-pattern="components" \
         target/kcov \
-        ${exe} -- --nocapture | ts '[%M:%.S]'
+        ${exe} --nocapture | ts '[%M:%.S]'
 done
 
 # Automatically reads from CODECOV_TOKEN environment variable:
