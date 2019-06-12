@@ -144,8 +144,7 @@ fn handle_request_send_funds<B>(
 ) where
     B: Clone + PartialEq + Eq + CanonicalSerialize + Debug,
 {
-    let next_index = 1;
-    if next_index >= request_send_funds.route.len() {
+    if dbg!(&request_send_funds.route).is_empty() {
         // We are the destination of this request.
 
         // First make sure that we have a matching open invoice for this transaction:
@@ -186,7 +185,7 @@ fn handle_request_send_funds<B>(
 
     // We are not the destination of this request.
     // The node on the route has to be one of our friends:
-    let next_public_key = request_send_funds.route.index_to_pk(next_index).unwrap();
+    let next_public_key = request_send_funds.route.index_to_pk(0).unwrap();
     let friend_exists = m_state.state().friends.contains_key(next_public_key);
 
     // This friend must be considered online for us to forward the message.
