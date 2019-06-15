@@ -262,11 +262,7 @@ fn process_response_send_funds(
         .ok_or(ProcessOperationError::RequestDoesNotExist)?
         .clone();
 
-    let dest_public_key = if pending_transaction.route.public_keys.is_empty() {
-        &mutual_credit.state().idents.remote_public_key
-    } else {
-        pending_transaction.route.public_keys.last().unwrap()
-    };
+    let dest_public_key = pending_transaction.route.public_keys.last().unwrap();
 
     let response_signature_buffer =
         create_response_signature_buffer(&response_send_funds, &pending_transaction);
