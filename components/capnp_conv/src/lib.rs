@@ -31,7 +31,6 @@ pub enum CapnpConvError {
 /// Convert Rust struct to Capnp.
 pub trait WriteCapnp<'a> {
     /// The corresponding Capnp writer type.
-    // type WriterType: capnp::traits::FromPointerBuilder<'a>;
     type WriterType: capnp::traits::FromPointerBuilder<'a>;
 
     /// Converts a Rust struct to corresponding Capnp struct. This should not fail.
@@ -43,7 +42,7 @@ pub trait ReadCapnp<'a>: Sized {
     /// The corresponding Capnp reader type.
     type ReaderType: capnp::traits::FromPointerReader<'a>;
 
-    /// Converts a Capnp struct to corresponding Rust struct.     
+    /// Converts a Capnp struct to corresponding Rust struct.
     fn read_capnp(reader: &Self::ReaderType) -> Result<Self, CapnpConvError>;
 }
 

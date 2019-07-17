@@ -162,7 +162,7 @@ pub fn gen_list_read_iter(path: &syn::Path) -> TokenStream {
 }
 
 /// A shim allowing to merge cases where either
-/// Result<T,Into<CapnoConvError>> or a T is returned.
+/// Result<T,Into<CapnpConvError>> or a T is returned.
 pub fn capnp_result_shim() -> TokenStream {
     quote! {
         pub enum CapnpResult<T> {
