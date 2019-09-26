@@ -12,7 +12,7 @@ proto = { path = "../proto", version = "0.1.0", package = "offst-proto" }
 
 rand = "0.5"
 # ring = "=0.13.0-alpha"
-ring = { git = "https://github.com/freedomlayer/ring", branch = "real/version-0.13.0-alpha4" }
+ring = { path = "../../../ring" } # 0.13.5 with added #[derive(Clone)] to SystemRandom
 untrusted = "0.6"
 
 serde = {version = "1", features = ["derive"]}

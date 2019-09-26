@@ -3,7 +3,7 @@ use std::clone::Clone;
 use std::sync::Mutex;
 
 use rand::{self, RngCore, StdRng};
-use ring::{error::Unspecified, rand::SecureRandom};
+use ring::error::Unspecified;
 
 use crate::rand::CryptoRandom;
 
@@ -35,7 +35,7 @@ impl DummyRandom {
     }
 }
 
-impl SecureRandom for DummyRandom {
+impl CryptoRandom for DummyRandom {
     fn fill(&self, dest: &mut [u8]) -> Result<(), Unspecified> {
         let guard = self.inner.lock().unwrap();
         let ref_cell = &*guard;
@@ -43,5 +43,3 @@ impl SecureRandom for DummyRandom {
         Ok(())
     }
 }
-
-impl CryptoRandom for DummyRandom {}

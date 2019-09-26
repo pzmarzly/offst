@@ -3,12 +3,21 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use ring::error::Unspecified;
-use ring::rand::{SecureRandom, SystemRandom};
-use ring::test::rand::FixedByteRandom;
+use ring::rand::SecureRandom;
 
 use proto::crypto::{InvoiceId, PaymentId, PlainLock, RandValue, Salt, Uid};
 
-pub trait CryptoRandom: SecureRandom + Sync + Send {}
+pub use ring::rand::SystemRandom;
+
+pub trait CryptoRandom: Sync + Send {
+    fn fill(&self, dest: &mut [u8]) -> Result<(), Unspecified>;
+}
+
+impl CryptoRandom for SystemRandom {
+    fn fill(&self, dest: &mut [u8]) -> Result<(), Unspecified> {
+        SecureRandom::fill(self, dest)
+    }
+}
 
 pub struct RngContainer<R> {
     arc_rng: Arc<R>,
@@ -30,14 +39,11 @@ impl<R> Clone for RngContainer<R> {
     }
 }
 
-impl<R: SecureRandom> SecureRandom for RngContainer<R> {
+impl<R: CryptoRandom> CryptoRandom for RngContainer<R> {
     fn fill(&self, dest: &mut [u8]) -> Result<(), Unspecified> {
         (*self.arc_rng).fill(dest)
     }
 }
-
-impl<R: SecureRandom> CryptoRandom for RngContainer<R> where R: Sync + Send {}
-impl CryptoRandom for FixedByteRandom {}
 
 impl<R> Deref for RngContainer<R> {
     type Target = R;
